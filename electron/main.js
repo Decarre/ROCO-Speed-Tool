@@ -44,6 +44,7 @@ function createWindow() {
       preload: appPath("electron", "preload.js"),
       contextIsolation: false,
       nodeIntegration: false,
+      sandbox: false,
       additionalArguments: [`--roco-data-dir=${appDataDir()}`]
     }
   });
