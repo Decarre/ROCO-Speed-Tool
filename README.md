@@ -1,28 +1,38 @@
 # 洛克王国世界速度工具
 
-双击 `启动速度工具.bat` 即可打开本地工具。
+本项目现在提供桌面版：安装后点击程序图标即可打开独立窗口，不需要手动打开浏览器页面。
 
-功能：
+## 使用
 
-- 按公式计算减速、不变、加速三种性格速度
-- 从 BWiki 精灵图鉴自动抓取精灵名称、立绘链接和种族值
-- 从 BWiki 技能图鉴自动抓取加速技能，并记录每只精灵可使用的加速技能
-- 搜索本地精灵资料库
-- 自动记住查询历史
-- 支持导入/导出 JSON 或 CSV 数据
+- 安装版：从 GitHub Release 下载 `洛克王国世界速度工具 Setup.exe`，安装后从桌面或开始菜单启动。
+- 开发版：运行 `npm install` 后执行 `npm start`。
+- 首次打开不会内置完整数据库，点击右上角“更新数据库”后会从 BWiki 抓取精灵和技能数据。
+- 数据库会保存到系统应用数据目录，不会打包进安装包。
 
-数据库更新：
+## 功能
+
+- 按公式计算减速、默认、加速三种性格速度
+- 计算加速技能，并支持设置技能使用次数
+- 从 BWiki 精灵图鉴抓取精灵名称、编号、立绘链接和种族值
+- 从 BWiki 技能图鉴抓取加速技能，并按精灵可用技能匹配
+- 支持按名称、`noXXX` 编号、`sXXX` 速度搜索
+- 自动记住查询历史，支持单条编辑/删除
+- 显示竖向速度线和常见速度点
+
+## 数据库更新
+
+桌面版推荐直接点击右上角“更新数据库”。
+
+命令行也可以更新：
 
 ```text
-双击 启动速度工具.bat：先自动更新数据库，再打开工具
-双击 更新数据库.bat：只更新数据库
-node scripts\update-db.js：更新精灵和技能数据库，并下载立绘到 data/images
-node scripts\update-db.js --no-images：更新精灵和技能数据库，只使用远程立绘链接
-node scripts\update-db.js --skills-only --no-images：只更新加速技能映射
-node scripts\update-db.js --spirits-only --no-images：只更新精灵种族值
+npm run update-db
+node scripts\update-db.js --no-images
+node scripts\update-db.js --skills-only --no-images
+node scripts\update-db.js --spirits-only --no-images
 ```
 
-生成文件：
+默认命令会生成：
 
 ```text
 data/spirits-db.json
@@ -32,7 +42,18 @@ data/skills-db.js
 data/images/
 ```
 
-计算公式：
+这些文件是本地生成数据，不作为程序本体提交或打包。
+
+## 打包
+
+```text
+npm install
+npm run dist
+```
+
+安装包会输出到 `dist/`，并排除已下载的数据库和图片。
+
+## 计算公式
 
 ```text
 速度 = round((round(1.1 × 基础速度) + round(0.55 × 个体值) + 10) × 性格修正) + 50
@@ -42,10 +63,8 @@ data/images/
 
 ```text
 减速 = 0.9
-不变 = 1.0
+默认 = 1.0
 加速 = 1.2
 ```
 
 精灵图鉴数据来源：洛克王国:手游WIKI_BWIKI。该 WIKI 页面声明文本数据采用 CC BY-NC-SA 4.0，使用时请按其要求署名并用于非商业用途。
-
-查询历史和你手动编辑的数据保存在浏览器本机的 localStorage 中。导出数据可以作为备份。

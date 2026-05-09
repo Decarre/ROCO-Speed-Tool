@@ -1,0 +1,48 @@
+{
+  "name": "roco-speed-tool",
+  "version": "0.4.0",
+  "description": "洛克王国世界速度计算桌面工具",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "update-db": "node scripts/update-db.js",
+    "dist": "electron-builder --win nsis"
+  },
+  "author": "Decarre",
+  "license": "CC-BY-NC-SA-4.0",
+  "devDependencies": {
+    "electron": "^30.5.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.decarre.rocospeedtool",
+    "productName": "洛克王国世界速度工具",
+    "asar": false,
+    "files": [
+      "index.html",
+      "electron/**/*",
+      "scripts/**/*",
+      "README.md",
+      "!data/**",
+      "!test/**",
+      "!dist/**",
+      "!node_modules/.cache/**"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "洛克王国世界速度工具"
+    }
+  }
+}

@@ -1,10 +1,9 @@
 @echo off
 cd /d "%~dp0"
-where node >nul 2>nul
+where npm >nul 2>nul
 if %errorlevel%==0 (
-  echo 正在自动更新精灵数据库...
-  node scripts\update-db.js
+  npm start
 ) else (
-  echo 未检测到 Node.js，跳过自动更新。
+  echo 未检测到 npm，改为用默认浏览器打开开发版页面。
+  start "" "%~dp0index.html"
 )
-start "" "%~dp0index.html"

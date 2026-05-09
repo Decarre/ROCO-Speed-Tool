@@ -3,10 +3,14 @@
 
 const fs = require("fs/promises");
 const path = require("path");
+const { pathToFileURL } = require("url");
 const { setTimeout: sleep } = require("timers/promises");
 
 const ROOT = path.resolve(__dirname, "..");
-const DATA_DIR = path.join(ROOT, "data");
+const DATA_DIR = process.env.ROCO_DATA_DIR
+  ? path.resolve(process.env.ROCO_DATA_DIR)
+  : path.join(ROOT, "data");
+const USE_EXTERNAL_DATA_DIR = Boolean(process.env.ROCO_DATA_DIR);
 const IMAGE_DIR = path.join(DATA_DIR, "images");
 const JSON_PATH = path.join(DATA_DIR, "spirits-db.json");
 const JS_PATH = path.join(DATA_DIR, "spirits-db.js");
@@ -443,10 +447,11 @@ async function downloadPortrait(url, entry) {
   const fileName = `${safeFileName(`${entry.no}-${entry.displayName}`)}.${ext}`;
   const filePath = path.join(IMAGE_DIR, fileName);
   const relativePath = `data/images/${fileName}`;
+  const cachedPath = USE_EXTERNAL_DATA_DIR ? pathToFileURL(filePath).href : relativePath;
 
   try {
     await fs.access(filePath);
-    return relativePath;
+    return cachedPath;
   } catch {
     // Image is not cached yet.
   }
@@ -454,7 +459,7 @@ async function downloadPortrait(url, entry) {
   try {
     const bytes = await fetchBuffer(url);
     await fs.writeFile(filePath, bytes);
-    return relativePath;
+    return cachedPath;
   } catch (error) {
     console.warn(`立绘下载失败：${entry.displayName} ${error.message}`);
     return "";

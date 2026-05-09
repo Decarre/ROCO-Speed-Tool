@@ -640,6 +640,8 @@
         <p class="subtitle">本地保存精灵速度种族值和加速技能，查询后自动记忆历史。公式按分步四舍五入计算。</p>
       </div>
       <div class="actions">
+        <button id="desktopUpdateButton" hidden>更新数据库</button>
+        <button id="desktopDataDirButton" hidden>数据目录</button>
         <button id="exportButton">导出数据</button>
         <button id="resetButton" class="danger-button">恢复示例库</button>
       </div>
@@ -687,7 +689,7 @@
           <div class="panel-body">
             <div class="portrait-row">
               <img class="portrait" id="spiritPortrait" alt="" hidden>
-              <p class="hint" id="sourceLabel">资料库尚未自动更新时，会使用示例数据。运行“更新数据库.bat”后会载入完整图鉴数据。</p>
+              <p class="hint" id="sourceLabel">资料库尚未自动更新时，会使用示例数据。桌面版可点击右上角“更新数据库”。</p>
             </div>
             <div class="row">
               <div>
@@ -886,8 +888,8 @@
       { name: "示例-130速精灵", baseSpeed: 130 }
     ];
 
-    const defaultSpirits = getBundledSpirits();
-    const speedSkills = getBundledSpeedSkills();
+    let defaultSpirits = getBundledSpirits();
+    let speedSkills = getBundledSpeedSkills();
 
     const state = loadState();
     let selectedName = state.spirits[0]?.name || "";
@@ -895,6 +897,8 @@
 
     const el = {
       libraryCount: document.querySelector("#libraryCount"),
+      desktopUpdateButton: document.querySelector("#desktopUpdateButton"),
+      desktopDataDirButton: document.querySelector("#desktopDataDirButton"),
       searchInput: document.querySelector("#searchInput"),
       spiritList: document.querySelector("#spiritList"),
       spiritName: document.querySelector("#spiritName"),
@@ -965,6 +969,19 @@
         console.warn(error);
       }
       return { spirits: defaultSpirits, history: [] };
+    }
+
+    function reloadLibraryFromBundledDatabase() {
+      defaultSpirits = getBundledSpirits();
+      speedSkills = getBundledSpeedSkills();
+      state.spirits = mergeSpiritLists(defaultSpirits, normalizeSpirits(state.spirits));
+      saveState();
+      if (!selectedSpirit() && state.spirits[0]) {
+        selectedName = state.spirits[0].name;
+        el.spiritName.value = selectedName;
+        el.baseSpeed.value = state.spirits[0].baseSpeed;
+      }
+      renderAll();
     }
 
     function mergeSpiritLists(sourceSpirits, savedSpirits) {
@@ -1101,7 +1118,7 @@
       }
       el.sourceLabel.textContent = window.ROCO_SPIRITS_DB
         ? `已载入自动数据库：${window.ROCO_SPIRITS_DB.count || state.spirits.length} 只精灵，${speedSkills.length} 个加速技能，更新时间 ${formatTime(window.ROCO_SPIRITS_DB.updatedAt)}。`
-        : "资料库尚未自动更新时，会使用示例数据。运行“更新数据库.bat”后会载入完整图鉴数据。";
+        : "资料库尚未自动更新时，会使用示例数据。桌面版可点击右上角“更新数据库”。";
       document.querySelectorAll(".stat").forEach((node) => {
         node.classList.toggle("primary", node.dataset.nature === el.natureSelect.value);
       });
@@ -1697,6 +1714,34 @@
         .replaceAll("'", "&#039;");
     }
 
+    function initDesktopControls() {
+      if (!window.ROCO_DESKTOP) return;
+
+      el.desktopUpdateButton.hidden = false;
+      el.desktopDataDirButton.hidden = false;
+      el.desktopUpdateButton.addEventListener("click", async () => {
+        el.desktopUpdateButton.disabled = true;
+        el.calcMessage.textContent = "正在更新数据库，首次运行会比较久，请稍等...";
+        try {
+          const database = await window.ROCO_DESKTOP.updateDatabase({ noImages: true });
+          window.ROCO_SPIRITS_DB = database.spirits;
+          window.ROCO_SKILLS_DB = database.skills;
+          reloadLibraryFromBundledDatabase();
+          el.calcMessage.textContent = "数据库已更新完成。";
+        } catch (error) {
+          console.error(error);
+          el.calcMessage.textContent = error.message || "数据库更新失败。";
+        } finally {
+          el.desktopUpdateButton.disabled = false;
+        }
+      });
+
+      el.desktopDataDirButton.addEventListener("click", () => {
+        window.ROCO_DESKTOP.openDataDir();
+      });
+    }
+
+    initDesktopControls();
     document.querySelector("#saveSpiritButton").addEventListener("click", saveSpirit);
     document.querySelector("#deleteSpiritButton").addEventListener("click", deleteSpirit);
     document.querySelector("#newSpiritButton").addEventListener("click", () => {
