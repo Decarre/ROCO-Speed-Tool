@@ -228,9 +228,6 @@ function parseSkillIndex(html) {
     if (!name || isIgnoredLinkText(name) || /^NO\./i.test(name) || seen.has(name)) continue;
     if (/图鉴|筛选|WIKI|页面|历史|编辑|刷新|地图|工具|攻略|贡献|设置|分类|用户|文件|模板|模块|帮助/.test(name)) continue;
 
-    const nearbyHtml = html.slice(Math.max(0, match.index - 350), Math.min(html.length, match.index + 350));
-    if (!/技能图标|图标 技能/.test(decodeHtml(nearbyHtml))) continue;
-
     seen.add(name);
     entries.push({
       name,
@@ -262,7 +259,7 @@ function parseSkillEffect(text) {
   const normalized = text.replace(/\n+/g, "\n");
   const markIndex = normalized.indexOf("✦");
   if (markIndex >= 0) {
-    const afterMark = normalized.slice(markIndex + 1, markIndex + 240);
+    const afterMark = normalized.slice(markIndex + 1, markIndex + 1400);
     return afterMark
       .split(/\n可以学会的精灵|\n取自|\n分类/)[0]
       .replace(/\n+/g, "")
@@ -281,19 +278,24 @@ function parseSkillEffect(text) {
 
 function parseSpeedBoostVariants(effect) {
   const variants = [];
-  const regex = /速度\s*\+\s*(\d+)/g;
-  let match;
-  let index = 0;
+  const patterns = [
+    { regex: /速度\s*\+\s*(\d+)/g, valueIndex: 1 },
+    { regex: /\+\s*(\d+)\s*速度值?/g, valueIndex: 1 },
+    { regex: /增加\s*(\d+)\s*速度值?/g, valueIndex: 1 },
+    { regex: /获得\s*(\d+)\s*速度值?/g, valueIndex: 1 }
+  ];
 
-  while ((match = regex.exec(effect))) {
-    const speedBonus = Number(match[1]);
-    if (!Number.isFinite(speedBonus) || speedBonus <= 0) continue;
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.regex.exec(effect))) {
+      const speedBonus = Number(match[pattern.valueIndex]);
+      if (!Number.isFinite(speedBonus) || speedBonus <= 0) continue;
 
-    const label = index === 0 ? "默认" : labelBefore(effect, match.index);
-    if (!variants.some((item) => item.speedBonus === speedBonus && item.label === label)) {
-      variants.push({ label, speedBonus });
+      const label = variants.length === 0 ? "默认" : labelBefore(effect, match.index);
+      if (!variants.some((item) => item.speedBonus === speedBonus && item.label === label)) {
+        variants.push({ label, speedBonus });
+      }
     }
-    index += 1;
   }
 
   return variants;

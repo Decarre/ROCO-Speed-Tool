@@ -299,6 +299,53 @@
       font-weight: 800;
     }
 
+    .history-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      padding: 9px 10px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .history-item:last-child {
+      border-bottom: 0;
+    }
+
+    .history-title {
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .history-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .history-actions button {
+      min-height: 32px;
+      padding: 5px 8px;
+      font-size: 12px;
+    }
+
+    dialog {
+      width: min(520px, calc(100% - 28px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      color: var(--ink);
+    }
+
+    dialog::backdrop {
+      background: rgba(15, 23, 42, 0.36);
+    }
+
+    .dialog-title {
+      margin: 0 0 14px;
+      font-size: 20px;
+    }
+
     .badge {
       color: var(--muted);
       font-size: 12px;
@@ -390,6 +437,11 @@
       background: var(--soft);
       box-shadow: 0 8px 18px rgba(22, 36, 54, 0.18);
       cursor: default;
+      z-index: 4;
+    }
+
+    .speed-marker:hover {
+      z-index: 30;
     }
 
     .speed-marker img {
@@ -488,7 +540,7 @@
       left: 50%;
       bottom: 52px;
       transform: translateX(-50%);
-      z-index: 3;
+      z-index: 40;
       display: none;
       width: max-content;
       max-width: 240px;
@@ -505,6 +557,30 @@
 
     .speed-marker:hover .tooltip {
       display: block;
+    }
+
+    .context-menu {
+      position: fixed;
+      z-index: 20;
+      display: none;
+      min-width: 150px;
+      padding: 6px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: var(--shadow);
+    }
+
+    .context-menu.show {
+      display: grid;
+      gap: 4px;
+    }
+
+    .context-menu button {
+      min-height: 32px;
+      border: 0;
+      text-align: left;
+      font-size: 13px;
     }
 
     .speed-line .speed-axis {
@@ -578,7 +654,7 @@
         <div class="panel-body stack">
           <div>
             <label for="searchInput">搜索精灵</label>
-            <input id="searchInput" type="search" placeholder="输入名称或速度">
+              <input id="searchInput" type="search" placeholder="名称 / no230 / s90">
           </div>
           <div class="list" id="spiritList"></div>
 
@@ -623,19 +699,26 @@
                 <label for="natureSelect">主要展示性格</label>
                 <select id="natureSelect">
                   <option value="slow">减速性格 0.9</option>
-                  <option value="neutral">不变性格 1.0</option>
+                  <option value="neutral">默认性格 1.0</option>
                   <option value="fast" selected>加速性格 1.2</option>
                 </select>
                 <p class="hint">下方会同时给出三种性格，选项只影响高亮和历史记录。</p>
               </div>
             </div>
 
-            <div style="margin: 14px 0;">
-              <label for="skillSelect">加速技能</label>
-              <select id="skillSelect">
-                <option value="0">不使用技能</option>
-              </select>
-              <p class="hint" id="skillHint">技能数据来自 BWiki 技能图鉴，只显示效果文本中包含“速度+数字”的技能。</p>
+            <div class="row" style="margin: 14px 0;">
+              <div>
+                <label for="skillSelect">加速技能</label>
+                <select id="skillSelect">
+                  <option value="0">不使用技能</option>
+                </select>
+                <p class="hint" id="skillHint">技能数据来自 BWiki 技能图鉴，只显示效果文本中包含“速度+数字”的技能。</p>
+              </div>
+              <div>
+                <label for="skillUses">使用次数</label>
+                <input id="skillUses" type="number" min="0" step="1" value="1">
+                <p class="hint">技能加速值会按次数叠加。</p>
+              </div>
             </div>
 
             <div class="stats">
@@ -644,7 +727,7 @@
                 <strong id="slowSpeed">-</strong>
               </div>
               <div class="stat" data-nature="neutral">
-                <span>不变性格 1.0</span>
+                <span>默认性格 1.0</span>
                 <strong id="neutralSpeed">-</strong>
               </div>
               <div class="stat" data-nature="fast">
@@ -737,6 +820,58 @@
     </section>
   </main>
 
+  <dialog id="historyDialog">
+    <h2 class="dialog-title">编辑历史记录</h2>
+    <div class="stack">
+      <div class="row">
+        <div>
+          <label for="editHistoryName">精灵名称</label>
+          <input id="editHistoryName">
+        </div>
+        <div>
+          <label for="editHistoryBaseSpeed">基础速度</label>
+          <input id="editHistoryBaseSpeed" type="number" min="0" step="1">
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label for="editHistoryIv">速度个体值</label>
+          <input id="editHistoryIv" type="number" min="0" step="1">
+        </div>
+        <div>
+          <label for="editHistoryNature">性格</label>
+          <select id="editHistoryNature">
+            <option value="slow">减速性格 0.9</option>
+            <option value="neutral">默认性格 1.0</option>
+            <option value="fast">加速性格 1.2</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="editHistorySkillBonus">技能加速值</label>
+        <input id="editHistorySkillBonus" type="number" min="0" step="1">
+        <p class="hint">这里只编辑历史记录中的技能加速值，不会修改精灵资料库。</p>
+      </div>
+      <div>
+        <label for="editHistorySkillUses">使用次数</label>
+        <input id="editHistorySkillUses" type="number" min="0" step="1">
+      </div>
+      <div>
+        <label for="editHistorySkillName">技能名称</label>
+        <input id="editHistorySkillName" placeholder="无技能可留空">
+      </div>
+      <div class="actions">
+        <button class="primary-button" id="saveHistoryEditButton">保存记录</button>
+        <button id="cancelHistoryEditButton">取消</button>
+      </div>
+      <p class="message" id="historyEditMessage"></p>
+    </div>
+  </dialog>
+
+  <div class="context-menu" id="speedContextMenu">
+    <button type="button" class="danger-button" id="deleteSpeedRecordButton">删除这条记录</button>
+  </div>
+
   <script src="data/spirits-db.js"></script>
   <script src="data/skills-db.js"></script>
   <script>
@@ -767,6 +902,7 @@
       individualValue: document.querySelector("#individualValue"),
       natureSelect: document.querySelector("#natureSelect"),
       skillSelect: document.querySelector("#skillSelect"),
+      skillUses: document.querySelector("#skillUses"),
       skillHint: document.querySelector("#skillHint"),
       selectedSpiritLabel: document.querySelector("#selectedSpiritLabel"),
       spiritPortrait: document.querySelector("#spiritPortrait"),
@@ -788,8 +924,21 @@
       speedLineCount: document.querySelector("#speedLineCount"),
       referenceOffset: document.querySelector("#referenceOffset"),
       referenceOffsetValue: document.querySelector("#referenceOffsetValue"),
+      speedContextMenu: document.querySelector("#speedContextMenu"),
+      deleteSpeedRecordButton: document.querySelector("#deleteSpeedRecordButton"),
+      historyDialog: document.querySelector("#historyDialog"),
+      editHistoryName: document.querySelector("#editHistoryName"),
+      editHistoryBaseSpeed: document.querySelector("#editHistoryBaseSpeed"),
+      editHistoryIv: document.querySelector("#editHistoryIv"),
+      editHistoryNature: document.querySelector("#editHistoryNature"),
+      editHistorySkillBonus: document.querySelector("#editHistorySkillBonus"),
+      editHistorySkillUses: document.querySelector("#editHistorySkillUses"),
+      editHistorySkillName: document.querySelector("#editHistorySkillName"),
+      historyEditMessage: document.querySelector("#historyEditMessage"),
       importText: document.querySelector("#importText")
     };
+    let editingHistoryIndex = -1;
+    let contextHistoryIndex = -1;
 
     function round(value) {
       return Math.round(value);
@@ -826,14 +975,15 @@
         map.set(spirit.name, {
           ...(source || {}),
           ...spirit,
-          image: spirit.image || source?.image || "",
-          pageUrl: spirit.pageUrl || source?.pageUrl || "",
-          no: spirit.no || source?.no || "",
-          stats: spirit.stats || source?.stats || null,
+            image: spirit.image || source?.image || "",
+            pageUrl: spirit.pageUrl || source?.pageUrl || "",
+            no: spirit.no || source?.no || "",
+            noNumber: spirit.noNumber || source?.noNumber || null,
+            stats: spirit.stats || source?.stats || null,
           speedSkills: spirit.speedSkills?.length ? spirit.speedSkills : (source?.speedSkills || [])
         });
       });
-      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+      return sortSpirits(Array.from(map.values()));
     }
 
     function saveState() {
@@ -854,12 +1004,29 @@
             image: item.image || item.localImage || item.portraitUrl || "",
             pageUrl: item.pageUrl || "",
             no: item.no || "",
+            noNumber: item.noNumber || null,
             stats: item.stats || null,
             speedSkills: Array.isArray(item.speedSkills) ? item.speedSkills : []
           });
         }
       });
-      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+      return sortSpirits(Array.from(map.values()));
+    }
+
+    function sortSpirits(spirits) {
+      return spirits.sort((a, b) => {
+        const aNo = spiritNumber(a);
+        const bNo = spiritNumber(b);
+        if (aNo !== bNo) return aNo - bNo;
+        return a.name.localeCompare(b.name, "zh-Hans-CN");
+      });
+    }
+
+    function spiritNumber(spirit) {
+      const fromNumber = Number(spirit.noNumber);
+      if (Number.isFinite(fromNumber) && fromNumber > 0) return fromNumber;
+      const match = String(spirit.no || "").match(/\d+/);
+      return match ? Number(match[0]) : Number.MAX_SAFE_INTEGER;
     }
 
     function selectedSpirit() {
@@ -876,9 +1043,21 @@
     function renderLibrary() {
       const keyword = el.searchInput.value.trim().toLowerCase();
       const spirits = state.spirits.filter((spirit) => {
-        return !keyword ||
-          spirit.name.toLowerCase().includes(keyword) ||
-          String(spirit.baseSpeed).includes(keyword);
+        if (!keyword) return true;
+
+        const noMatch = keyword.match(/^no\s*0*(\d+)$/i);
+        if (noMatch) {
+          return spiritNumber(spirit) === Number(noMatch[1]);
+        }
+
+        const speedMatch = keyword.match(/^s\s*(\d+)$/i);
+        if (speedMatch) {
+          return Number(spirit.baseSpeed) === Number(speedMatch[1]);
+        }
+
+        return spirit.name.toLowerCase().includes(keyword) ||
+          String(spirit.baseSpeed).includes(keyword) ||
+          String(spirit.no || "").toLowerCase().includes(keyword);
       });
 
       el.libraryCount.textContent = `${state.spirits.length}只`;
@@ -893,7 +1072,8 @@
         const button = document.createElement("button");
         button.type = "button";
         button.className = spirit.name === selectedName ? "active" : "";
-        button.innerHTML = `${imageHtml(spirit.image, spirit.name)}<span>${escapeHtml(spirit.name)}</span><span class="badge">速 ${spirit.baseSpeed}</span>`;
+        const noText = spirit.no ? `${escapeHtml(spirit.no)} · ` : "";
+        button.innerHTML = `${imageHtml(spirit.image, spirit.name)}<span>${escapeHtml(spirit.name)}</span><span class="badge">${noText}速 ${spirit.baseSpeed}</span>`;
         button.addEventListener("click", () => {
           selectedName = spirit.name;
           el.spiritName.value = spirit.name;
@@ -937,20 +1117,22 @@
       const fast = calculate(baseSpeed, individualValue, 1.2);
       const detail = calculate(baseSpeed, individualValue, natureModifier(el.natureSelect.value));
       const selectedSkill = parseSelectedSkill();
-      const boosted = detail.speed + selectedSkill.speedBonus;
+      const uses = skillUseCount();
+      const skillTotal = selectedSkill.speedBonus * uses;
+      const boosted = detail.speed + skillTotal;
 
       el.slowSpeed.textContent = slow.speed;
       el.neutralSpeed.textContent = neutral.speed;
       el.fastSpeed.textContent = fast.speed;
       el.boostedLabel.textContent = selectedSkill.speedBonus > 0
-        ? `${natureLabel(el.natureSelect.value)} + ${selectedSkill.name}`
+        ? `${natureLabel(el.natureSelect.value)} + ${selectedSkill.name} × ${uses}`
         : `${natureLabel(el.natureSelect.value)}，无技能`;
       el.boostedSpeed.textContent = boosted;
       el.basePart.textContent = `round(${baseSpeed} × 1.1) = ${detail.basePart}`;
       el.ivPart.textContent = `round(${individualValue} × 0.55) = ${detail.ivPart}`;
       el.subtotalPart.textContent = `${detail.basePart} + ${detail.ivPart} + 10 = ${detail.subtotal}`;
       el.skillPart.textContent = selectedSkill.speedBonus > 0
-        ? `${detail.speed} + ${selectedSkill.speedBonus} = ${boosted}（${selectedSkill.name}：${selectedSkill.label}）`
+        ? `${detail.speed} + ${selectedSkill.speedBonus} × ${uses} = ${boosted}（${selectedSkill.name}：${selectedSkill.label}）`
         : `${detail.speed} + 0 = ${boosted}`;
     }
 
@@ -962,22 +1144,105 @@
       }
 
       state.history.slice(0, 80).forEach((item) => {
-        const button = document.createElement("button");
-        button.type = "button";
+        const index = state.history.indexOf(item);
+        const row = document.createElement("div");
+        row.className = "history-item";
         const natureText = natureLabel(item.nature);
-        const skillText = item.skillName ? ` · ${item.skillName}` : "";
-        button.innerHTML = `<span>${escapeHtml(item.name)} · ${natureText}${skillText} · ${item.result}速</span><span class="badge">B${item.baseSpeed} / IV${item.individualValue}</span>`;
-        button.addEventListener("click", () => {
-          selectedName = item.name;
-          el.spiritName.value = item.name;
-          el.baseSpeed.value = item.baseSpeed;
-          el.individualValue.value = item.individualValue;
-          el.natureSelect.value = item.nature;
-          el.skillSelect.value = item.skillValue || "0";
-          renderAll();
-        });
-        el.historyList.appendChild(button);
+        const uses = historySkillUses(item);
+        const skillText = item.skillName ? ` · ${item.skillName}×${uses}` : "";
+        row.innerHTML = `
+          <div>
+            <div class="history-title">${escapeHtml(item.name)} · ${natureText}${skillText} · ${item.result}速</div>
+            <div class="badge">B${item.baseSpeed} / IV${item.individualValue}</div>
+          </div>
+          <div class="history-actions">
+            <button type="button" data-action="load">载入</button>
+            <button type="button" data-action="edit">编辑</button>
+            <button type="button" class="danger-button" data-action="delete">删除</button>
+          </div>
+        `;
+        row.querySelector('[data-action="load"]').addEventListener("click", () => loadHistoryItem(item));
+        row.querySelector('[data-action="edit"]').addEventListener("click", () => openHistoryEditor(index));
+        row.querySelector('[data-action="delete"]').addEventListener("click", () => deleteHistoryItem(index));
+        el.historyList.appendChild(row);
       });
+    }
+
+    function loadHistoryItem(item) {
+      selectedName = item.name;
+      el.spiritName.value = item.name;
+      el.baseSpeed.value = item.baseSpeed;
+      el.individualValue.value = item.individualValue;
+      el.natureSelect.value = item.nature;
+      el.skillSelect.value = item.skillValue || "0";
+      el.skillUses.value = item.skillName ? historySkillUses(item) : 1;
+      renderAll();
+    }
+
+    function openHistoryEditor(index) {
+      const item = state.history[index];
+      if (!item) return;
+      editingHistoryIndex = index;
+      el.editHistoryName.value = item.name;
+      el.editHistoryBaseSpeed.value = item.baseSpeed;
+      el.editHistoryIv.value = item.individualValue;
+      el.editHistoryNature.value = item.nature;
+      el.editHistorySkillBonus.value = item.skillBonus || 0;
+      el.editHistorySkillUses.value = historySkillUses(item);
+      el.editHistorySkillName.value = item.skillName || "";
+      el.historyEditMessage.textContent = "";
+      el.historyDialog.showModal();
+    }
+
+    function saveHistoryEdit() {
+      const item = state.history[editingHistoryIndex];
+      if (!item) return;
+
+      const name = el.editHistoryName.value.trim();
+      const baseSpeed = Number(el.editHistoryBaseSpeed.value);
+      const individualValue = Number(el.editHistoryIv.value);
+      const nature = el.editHistoryNature.value;
+      const skillBonus = Number(el.editHistorySkillBonus.value) || 0;
+      const skillUses = Number(el.editHistorySkillUses.value);
+      const skillName = el.editHistorySkillName.value.trim();
+
+      if (!name || !Number.isFinite(baseSpeed) || !Number.isFinite(individualValue) || !Number.isFinite(skillUses) || baseSpeed < 0 || individualValue < 0 || skillBonus < 0 || skillUses < 0) {
+        el.historyEditMessage.textContent = "请填写有效的记录数据。";
+        return;
+      }
+
+      const baseResult = calculate(baseSpeed, individualValue, natureModifier(nature)).speed;
+      const roundedSkillBonus = round(skillBonus);
+      const roundedSkillUses = round(skillUses);
+      state.history[editingHistoryIndex] = {
+        ...item,
+        name,
+        baseSpeed: round(baseSpeed),
+        individualValue: round(individualValue),
+        nature,
+        skillName,
+        skillBonus: roundedSkillBonus,
+        skillUses: roundedSkillUses,
+        skillValue: skillName ? `${skillName}|手动编辑|${roundedSkillBonus}` : "0",
+        result: baseResult + roundedSkillBonus * roundedSkillUses,
+        editedAt: new Date().toISOString()
+      };
+      saveState();
+      el.historyDialog.close();
+      renderHistory();
+      renderSpeedLine();
+    }
+
+    function deleteHistoryItem(index) {
+      const item = state.history[index];
+      if (!item) return;
+      if (!window.confirm(`确认删除这条记录吗？\n${item.name} · ${natureLabel(item.nature)} · ${item.result}速`)) {
+        return;
+      }
+      state.history.splice(index, 1);
+      saveState();
+      renderHistory();
+      renderSpeedLine();
     }
 
     function saveSpirit() {
@@ -1050,7 +1315,8 @@
       const nature = el.natureSelect.value;
       const selectedSkill = parseSelectedSkill();
       const baseResult = calculate(baseSpeed, individualValue, natureModifier(nature)).speed;
-      const result = baseResult + selectedSkill.speedBonus;
+      const uses = skillUseCount();
+      const result = baseResult + selectedSkill.speedBonus * uses;
 
       state.history.unshift({
         name,
@@ -1060,6 +1326,7 @@
         skillValue: el.skillSelect.value,
         skillName: selectedSkill.speedBonus > 0 ? selectedSkill.name : "",
         skillBonus: selectedSkill.speedBonus,
+        skillUses: selectedSkill.speedBonus > 0 ? uses : 0,
         result,
         time: new Date().toISOString()
       });
@@ -1102,12 +1369,14 @@
 
       entries.forEach((item, index) => {
         const spirit = state.spirits.find((candidate) => candidate.name === item.name);
+        const historyIndex = state.history.indexOf(item);
         const marker = document.createElement("div");
         marker.className = "speed-marker";
         positionSpeedElement(marker, item.result, minSpeed, span, index);
         const isFast = item.nature === "fast";
         const hasFullIv = Number(item.individualValue) >= 60;
-        const skillText = item.skillName ? `<br>技能：${escapeHtml(item.skillName)} +${item.skillBonus || 0}` : "";
+        const uses = historySkillUses(item);
+        const skillText = item.skillName ? `<br>技能：${escapeHtml(item.skillName)} +${item.skillBonus || 0} × ${uses}` : "";
         marker.innerHTML = `
           ${spirit?.image ? `<img src="${escapeHtml(spirit.image)}" alt="${escapeHtml(item.name)}">` : `<span>${escapeHtml(item.name.slice(0, 1))}</span>`}
           <div class="tooltip">
@@ -1118,8 +1387,24 @@
             个体值：${item.individualValue}${hasFullIv ? "（满个体）" : ""}${skillText}
           </div>
         `;
+        marker.addEventListener("contextmenu", (event) => {
+          event.preventDefault();
+          openSpeedContextMenu(event.clientX, event.clientY, historyIndex);
+        });
         el.speedLine.appendChild(marker);
       });
+    }
+
+    function openSpeedContextMenu(x, y, historyIndex) {
+      contextHistoryIndex = historyIndex;
+      el.speedContextMenu.style.left = `${x}px`;
+      el.speedContextMenu.style.top = `${y}px`;
+      el.speedContextMenu.classList.add("show");
+    }
+
+    function closeSpeedContextMenu() {
+      el.speedContextMenu.classList.remove("show");
+      contextHistoryIndex = -1;
     }
 
     function renderSpeedTicks(minSpeed, maxSpeed, span) {
@@ -1169,7 +1454,7 @@
         const fast = calculate(baseSpeed, 60, 1.2).speed;
         const color = palette[index % palette.length];
         return [
-          { baseSpeed, speed: neutral, color, label: `${neutral}：${baseSpeed}不变满 (${count})` },
+          { baseSpeed, speed: neutral, color, label: `${neutral}：${baseSpeed}默认满 (${count})` },
           { baseSpeed, speed: fast, color, label: `${fast}：${baseSpeed}加速满 (${count})` }
         ];
       });
@@ -1262,12 +1547,13 @@
       const neutral = calculate(baseSpeed, individualValue, 1).speed;
       const fast = calculate(baseSpeed, individualValue, 1.2).speed;
       const selectedSkill = parseSelectedSkill();
+      const uses = skillUseCount();
       const selectedNatureSpeed = calculate(baseSpeed, individualValue, natureModifier(el.natureSelect.value)).speed;
-      const boosted = selectedNatureSpeed + selectedSkill.speedBonus;
+      const boosted = selectedNatureSpeed + selectedSkill.speedBonus * uses;
       const skillText = selectedSkill.speedBonus > 0
-        ? `；${natureLabel(el.natureSelect.value)}使用${selectedSkill.name}后${boosted}`
+        ? `；${natureLabel(el.natureSelect.value)}使用${selectedSkill.name}×${uses}后${boosted}`
         : "";
-      const text = `${name}：基础速度${baseSpeed}，个体值${individualValue}；减速${slow}，不变${neutral}，加速${fast}${skillText}`;
+      const text = `${name}：基础速度${baseSpeed}，个体值${individualValue}；减速${slow}，默认${neutral}，加速${fast}${skillText}`;
 
       navigator.clipboard?.writeText(text).then(() => {
         el.calcMessage.textContent = "结果已复制。";
@@ -1300,7 +1586,7 @@
     }
 
     function natureLabel(nature) {
-      return { slow: "减速", neutral: "不变", fast: "加速" }[nature] || "不变";
+      return { slow: "减速", neutral: "默认", fast: "加速" }[nature] || "默认";
     }
 
     function renderSkillOptions() {
@@ -1340,6 +1626,17 @@
       };
     }
 
+    function skillUseCount() {
+      const uses = Number(el.skillUses.value);
+      if (!Number.isFinite(uses) || uses < 0) return 0;
+      return round(uses);
+    }
+
+    function historySkillUses(item) {
+      if (!item.skillName) return 0;
+      return item.skillUses ?? 1;
+    }
+
     function getBundledSpirits() {
       if (window.ROCO_SPIRITS_DB?.spirits?.length) {
         return window.ROCO_SPIRITS_DB.spirits.map((spirit) => ({
@@ -1349,6 +1646,7 @@
           image: spirit.localImage || spirit.portraitUrl || "",
           pageUrl: spirit.pageUrl || "",
           no: spirit.no || "",
+          noNumber: spirit.noNumber || null,
           stats: spirit.stats || null,
           speedSkills: Array.isArray(spirit.speedSkills) ? spirit.speedSkills : []
         }));
@@ -1413,7 +1711,25 @@
     });
     document.querySelector("#rememberButton").addEventListener("click", rememberQuery);
     document.querySelector("#copyResultButton").addEventListener("click", copyResult);
+    el.deleteSpeedRecordButton.addEventListener("click", () => {
+      if (contextHistoryIndex >= 0) {
+        deleteHistoryItem(contextHistoryIndex);
+      }
+      closeSpeedContextMenu();
+    });
+    document.addEventListener("click", (event) => {
+      if (!el.speedContextMenu.contains(event.target)) {
+        closeSpeedContextMenu();
+      }
+    });
+    document.querySelector("#saveHistoryEditButton").addEventListener("click", saveHistoryEdit);
+    document.querySelector("#cancelHistoryEditButton").addEventListener("click", () => {
+      el.historyDialog.close();
+    });
     document.querySelector("#clearHistoryButton").addEventListener("click", () => {
+      if (!window.confirm("确认清空全部历史记录吗？")) {
+        return;
+      }
       state.history = [];
       saveState();
       renderHistory();
@@ -1439,6 +1755,7 @@
       el.individualValue.addEventListener(eventName, renderCalculator);
       el.natureSelect.addEventListener(eventName, renderCalculator);
       el.skillSelect.addEventListener(eventName, renderCalculator);
+      el.skillUses.addEventListener(eventName, renderCalculator);
       el.spiritName.addEventListener(eventName, () => {
         selectedName = el.spiritName.value.trim();
         renderCalculator();
