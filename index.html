@@ -337,6 +337,204 @@
       display: block;
     }
 
+    .speed-line {
+      position: relative;
+      min-height: 260px;
+      margin-top: 12px;
+      padding: 74px 18px 46px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: linear-gradient(180deg, #fbfcfd, #f6faf8);
+      overflow: visible;
+    }
+
+    .speed-line {
+      --axis-x: 104px;
+      --reference-start: 124px;
+      --reference-debug-offset: 0px;
+      min-height: 620px;
+      padding: 24px 24px 24px 150px;
+    }
+
+    .speed-line::before {
+      content: "";
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      top: 138px;
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #9fb1c2, var(--accent));
+    }
+
+    .speed-line::before {
+      left: var(--axis-x);
+      right: auto;
+      top: 32px;
+      bottom: 56px;
+      width: 4px;
+      height: auto;
+      background: linear-gradient(180deg, var(--accent), #9fb1c2);
+    }
+
+    .speed-marker {
+      position: absolute;
+      top: 116px;
+      transform: translateX(-50%);
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      background: var(--soft);
+      box-shadow: 0 8px 18px rgba(22, 36, 54, 0.18);
+      cursor: default;
+    }
+
+    .speed-marker img {
+      width: 38px;
+      height: 38px;
+      object-fit: contain;
+      border-radius: 50%;
+    }
+
+    .speed-marker span {
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--accent-dark);
+    }
+
+    .speed-axis {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .speed-tick,
+    .speed-reference {
+      position: absolute;
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .speed-tick {
+      top: 122px;
+      width: 1px;
+      height: 34px;
+      background: rgba(98, 112, 131, 0.38);
+    }
+
+    .speed-tick span {
+      position: absolute;
+      top: 38px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .speed-reference {
+      left: calc(var(--reference-start) + var(--reference-debug-offset));
+      right: 24px;
+      height: 0;
+      border-top: 1px dashed var(--ref-color, #36536a);
+      color: var(--ref-color, #36536a);
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .speed-reference span {
+      position: absolute;
+      left: calc(100% + 12px);
+      top: -10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: #fff;
+      color: var(--ref-color, #36536a);
+    }
+
+    .debug-control {
+      display: grid;
+      grid-template-columns: 160px 1fr 88px;
+      gap: 10px;
+      align-items: center;
+      margin: 10px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .debug-control input {
+      height: 34px;
+      padding: 0;
+    }
+
+    .debug-value {
+      font-family: Consolas, "Courier New", monospace;
+      color: var(--accent-dark);
+      font-weight: 800;
+      text-align: right;
+    }
+
+    .tooltip {
+      position: absolute;
+      left: 50%;
+      bottom: 52px;
+      transform: translateX(-50%);
+      z-index: 3;
+      display: none;
+      width: max-content;
+      max-width: 240px;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: var(--shadow);
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.5;
+      white-space: normal;
+    }
+
+    .speed-marker:hover .tooltip {
+      display: block;
+    }
+
+    .speed-line .speed-axis {
+      left: 24px;
+      right: auto;
+      top: 28px;
+      bottom: 52px;
+      width: 68px;
+      display: grid;
+      align-content: space-between;
+      text-align: right;
+    }
+
+    .speed-line .speed-tick {
+      left: calc(var(--axis-x) - 16px);
+      width: 34px;
+      height: 1px;
+    }
+
+    .speed-line .speed-tick span {
+      top: -8px;
+      left: -8px;
+      transform: translateX(-100%);
+    }
+
+    .speed-line .speed-marker {
+      left: 104px;
+      transform: translate(-50%, -50%);
+    }
+
     code {
       color: #0f5d4b;
       font-family: Consolas, "Courier New", monospace;
@@ -468,6 +666,22 @@
         </section>
 
         <section class="panel">
+          <div class="panel-head">
+            <h2>速度线</h2>
+            <span class="badge" id="speedLineCount">0只</span>
+          </div>
+          <div class="panel-body">
+            <p class="hint">这里显示你点击“记录本次查询”保存过的速度状态，并从数据库标注常见速度线和120以上高速线。</p>
+            <div class="debug-control">
+              <label for="referenceOffset">参考线水平偏移</label>
+              <input id="referenceOffset" type="range" min="-200" max="500" step="1" value="198">
+              <span class="debug-value" id="referenceOffsetValue">198px</span>
+            </div>
+            <div class="speed-line" id="speedLine"></div>
+          </div>
+        </section>
+
+        <section class="panel">
           <div class="tabs">
             <button class="tab active" data-tab="detail">分步</button>
             <button class="tab" data-tab="history">历史</button>
@@ -542,6 +756,7 @@
 
     const state = loadState();
     let selectedName = state.spirits[0]?.name || "";
+    let referenceOffset = 198;
 
     const el = {
       libraryCount: document.querySelector("#libraryCount"),
@@ -569,6 +784,10 @@
       calcMessage: document.querySelector("#calcMessage"),
       importMessage: document.querySelector("#importMessage"),
       historyList: document.querySelector("#historyList"),
+      speedLine: document.querySelector("#speedLine"),
+      speedLineCount: document.querySelector("#speedLineCount"),
+      referenceOffset: document.querySelector("#referenceOffset"),
+      referenceOffsetValue: document.querySelector("#referenceOffsetValue"),
       importText: document.querySelector("#importText")
     };
 
@@ -651,6 +870,7 @@
       renderLibrary();
       renderCalculator();
       renderHistory();
+      renderSpeedLine();
     }
 
     function renderLibrary() {
@@ -775,6 +995,12 @@
       }
 
       const existing = state.spirits.find((spirit) => spirit.name === name);
+      const action = existing ? "覆盖保存" : "新增保存";
+      if (!window.confirm(`确认${action}精灵「${name}」吗？\n基础速度：${round(baseSpeed)}`)) {
+        el.libraryMessage.textContent = "已取消保存。";
+        return;
+      }
+
       if (existing) {
         existing.baseSpeed = round(baseSpeed);
       } else {
@@ -790,6 +1016,16 @@
 
     function deleteSpirit() {
       const name = el.spiritName.value.trim();
+      if (!name) {
+        el.libraryMessage.textContent = "请先选择或填写要删除的精灵。";
+        return;
+      }
+
+      if (!window.confirm(`确认删除精灵「${name}」吗？\n这个操作只影响本地资料库。`)) {
+        el.libraryMessage.textContent = "已取消删除。";
+        return;
+      }
+
       const before = state.spirits.length;
       state.spirits = state.spirits.filter((spirit) => spirit.name !== name);
 
@@ -831,6 +1067,141 @@
       saveState();
       el.calcMessage.textContent = "已记住这次查询。";
       renderHistory();
+      renderSpeedLine();
+    }
+
+    function renderSpeedLine() {
+      const entries = uniqueHistoryEntries();
+      el.speedLineCount.textContent = `${entries.length}只`;
+      el.speedLine.innerHTML = "";
+      el.speedLine.style.setProperty("--reference-debug-offset", `${referenceOffset}px`);
+      el.speedLine.className = "speed-line";
+
+      const references = speedReferences();
+      const speeds = [
+        ...entries.map((item) => item.result),
+        ...references.map((item) => item.speed)
+      ];
+      const minSpeed = Math.min(...speeds);
+      const maxSpeed = Math.max(...speeds);
+      const span = Math.max(1, maxSpeed - minSpeed);
+      renderSpeedTicks(minSpeed, maxSpeed, span);
+      renderSpeedReferences(references, minSpeed, span);
+
+      if (!entries.length) {
+        const empty = document.createElement("p");
+        empty.className = "hint";
+        empty.textContent = "暂无记录。选择精灵和状态后点击“记录本次查询”，头像会出现在这里。";
+        el.speedLine.appendChild(empty);
+      }
+
+      const axis = document.createElement("div");
+      axis.className = "speed-axis";
+      axis.innerHTML = `<span>${maxSpeed}</span><span>${minSpeed}</span>`;
+      el.speedLine.appendChild(axis);
+
+      entries.forEach((item, index) => {
+        const spirit = state.spirits.find((candidate) => candidate.name === item.name);
+        const marker = document.createElement("div");
+        marker.className = "speed-marker";
+        positionSpeedElement(marker, item.result, minSpeed, span, index);
+        const isFast = item.nature === "fast";
+        const hasFullIv = Number(item.individualValue) >= 60;
+        const skillText = item.skillName ? `<br>技能：${escapeHtml(item.skillName)} +${item.skillBonus || 0}` : "";
+        marker.innerHTML = `
+          ${spirit?.image ? `<img src="${escapeHtml(spirit.image)}" alt="${escapeHtml(item.name)}">` : `<span>${escapeHtml(item.name.slice(0, 1))}</span>`}
+          <div class="tooltip">
+            <strong>${escapeHtml(item.name)}</strong><br>
+            速度种族值：${item.baseSpeed}<br>
+            当前速度：${item.result}<br>
+            性格：${natureLabel(item.nature)}${isFast ? "（加速）" : ""}<br>
+            个体值：${item.individualValue}${hasFullIv ? "（满个体）" : ""}${skillText}
+          </div>
+        `;
+        el.speedLine.appendChild(marker);
+      });
+    }
+
+    function renderSpeedTicks(minSpeed, maxSpeed, span) {
+      const start = Math.ceil(minSpeed / 25) * 25;
+      for (let value = start; value <= maxSpeed; value += 25) {
+        const tick = document.createElement("div");
+        tick.className = "speed-tick";
+        positionSpeedElement(tick, value, minSpeed, span, 0, true);
+        tick.innerHTML = `<span>${value}</span>`;
+        el.speedLine.appendChild(tick);
+      }
+    }
+
+    function renderSpeedReferences(references, minSpeed, span) {
+      references.forEach((item, index) => {
+        const ref = document.createElement("div");
+        ref.className = "speed-reference";
+        ref.style.setProperty("--ref-color", item.color);
+        positionSpeedElement(ref, item.speed, minSpeed, span, index, true);
+        ref.innerHTML = `<span>${item.label}</span>`;
+        el.speedLine.appendChild(ref);
+      });
+    }
+
+    function speedReferences() {
+      const palette = ["#0f766e", "#2563eb", "#9333ea", "#c2410c", "#be123c", "#4d7c0f", "#0369a1", "#a16207", "#7c3aed", "#047857", "#b45309", "#475569"];
+      const counts = new Map();
+      state.spirits.forEach((spirit) => {
+        const baseSpeed = Number(spirit.baseSpeed);
+        if (Number.isFinite(baseSpeed) && baseSpeed > 0) {
+          counts.set(baseSpeed, (counts.get(baseSpeed) || 0) + 1);
+        }
+      });
+
+      const commonBaseSpeeds = Array.from(counts.entries())
+        .sort((a, b) => b[1] - a[1] || b[0] - a[0])
+        .slice(0, 10)
+        .map(([baseSpeed]) => baseSpeed);
+      const highBaseSpeeds = Array.from(counts.keys())
+        .filter((baseSpeed) => baseSpeed >= 120)
+        .sort((a, b) => a - b);
+      const baseSpeeds = Array.from(new Set([...commonBaseSpeeds, ...highBaseSpeeds])).sort((a, b) => a - b);
+
+      return baseSpeeds.flatMap((baseSpeed, index) => {
+        const count = counts.get(baseSpeed) || 0;
+        const neutral = calculate(baseSpeed, 60, 1).speed;
+        const fast = calculate(baseSpeed, 60, 1.2).speed;
+        const color = palette[index % palette.length];
+        return [
+          { baseSpeed, speed: neutral, color, label: `${neutral}：${baseSpeed}不变满 (${count})` },
+          { baseSpeed, speed: fast, color, label: `${fast}：${baseSpeed}加速满 (${count})` }
+        ];
+      });
+    }
+
+    function speedLineTop(speed, minSpeed, span) {
+      return 92 - ((speed - minSpeed) / span) * 78;
+    }
+
+    function positionSpeedElement(element, speed, minSpeed, span, index, isGuide = false) {
+      element.style.top = `${speedLineTop(speed, minSpeed, span)}%`;
+      if (element.classList.contains("speed-marker")) {
+        element.style.left = `${150 + (index % 5) * 52}px`;
+      }
+    }
+
+    function uniqueHistoryEntries() {
+      const map = new Map();
+      state.history.forEach((item) => {
+        const key = [
+          item.name,
+          item.baseSpeed,
+          item.individualValue,
+          item.nature,
+          item.skillValue || "0",
+          item.skillBonus || 0
+        ].join("|");
+        if (!map.has(key)) {
+          map.set(key, item);
+        }
+      });
+      return Array.from(map.values()).slice(0, 32);
     }
 
     function parseImport(text) {
@@ -1031,6 +1402,10 @@
     document.querySelector("#saveSpiritButton").addEventListener("click", saveSpirit);
     document.querySelector("#deleteSpiritButton").addEventListener("click", deleteSpirit);
     document.querySelector("#newSpiritButton").addEventListener("click", () => {
+      if (!window.confirm("确认清空当前编辑框并新建精灵吗？")) {
+        el.libraryMessage.textContent = "已取消新建。";
+        return;
+      }
       selectedName = "";
       el.spiritName.value = "";
       el.baseSpeed.value = 0;
@@ -1049,6 +1424,11 @@
     });
     document.querySelector("#exportButton").addEventListener("click", exportData);
     document.querySelector("#resetButton").addEventListener("click", resetLibrary);
+    el.referenceOffset.addEventListener("input", () => {
+      referenceOffset = Number(el.referenceOffset.value) || 0;
+      el.referenceOffsetValue.textContent = `${referenceOffset}px`;
+      renderSpeedLine();
+    });
     document.querySelectorAll(".tab").forEach((tab) => {
       tab.addEventListener("click", () => switchTab(tab.dataset.tab));
     });
