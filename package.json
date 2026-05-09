@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "update-db": "node scripts/update-db.js",
-    "dist": "electron-builder --win nsis"
+    "dist": "electron-builder --win nsis --publish never"
   },
   "author": "Decarre",
   "license": "CC-BY-NC-SA-4.0",
@@ -32,6 +32,7 @@
       "output": "dist"
     },
     "win": {
+      "signAndEditExecutable": false,
       "target": [
         "nsis"
       ]
