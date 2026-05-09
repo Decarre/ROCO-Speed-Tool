@@ -1,0 +1,950 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>洛克王国世界速度工具</title>
+  <style>
+    :root {
+      --bg: #f4f6f8;
+      --panel: #ffffff;
+      --ink: #1d2633;
+      --muted: #627083;
+      --line: #d9e1ea;
+      --soft: #eef6f3;
+      --accent: #147d64;
+      --accent-dark: #0f5d4b;
+      --warn: #a35a00;
+      --danger: #b42318;
+      --shadow: 0 14px 34px rgba(22, 36, 54, 0.12);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #e6f2ee 0, var(--bg) 290px);
+    }
+
+    main {
+      width: min(1180px, calc(100% - 28px));
+      margin: 0 auto;
+      padding: 28px 0;
+    }
+
+    header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: clamp(28px, 4vw, 40px);
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: #fbfcfd;
+    }
+
+    .panel-head h2 {
+      margin: 0;
+      font-size: 17px;
+    }
+
+    .panel-body {
+      padding: 16px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 14px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 7px;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 11px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+
+    input,
+    select {
+      height: 42px;
+    }
+
+    textarea {
+      min-height: 150px;
+      resize: vertical;
+      line-height: 1.5;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 13px;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: 3px solid rgba(20, 125, 100, 0.18);
+      border-color: var(--accent);
+    }
+
+    .hint {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    button {
+      min-height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font: inherit;
+      font-weight: 700;
+      color: var(--ink);
+      background: #fff;
+      cursor: pointer;
+    }
+
+    button:hover {
+      border-color: var(--accent);
+    }
+
+    .primary-button {
+      color: #fff;
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    .primary-button:hover {
+      background: var(--accent-dark);
+    }
+
+    .danger-button {
+      color: var(--danger);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat {
+      min-height: 100px;
+      padding: 13px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfd;
+    }
+
+    .stat.primary {
+      border-color: rgba(20, 125, 100, 0.38);
+      background: var(--soft);
+    }
+
+    .stat span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .stat strong {
+      display: block;
+      margin-top: 8px;
+      font-size: 34px;
+      line-height: 1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th,
+    td {
+      padding: 10px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 700;
+      background: #f8fafc;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .list {
+      max-height: 330px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+
+    .list button {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      min-height: 44px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      text-align: left;
+      font-weight: 500;
+      background: #fff;
+    }
+
+    .thumb {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+      border-radius: 6px;
+      background: #f3f6f8;
+    }
+
+    .portrait-row {
+      display: grid;
+      grid-template-columns: 110px 1fr;
+      gap: 14px;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .portrait {
+      width: 110px;
+      height: 110px;
+      object-fit: contain;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f8fafc;
+    }
+
+    .list button:last-child {
+      border-bottom: 0;
+    }
+
+    .list button.active {
+      color: var(--accent-dark);
+      background: var(--soft);
+      font-weight: 800;
+    }
+
+    .badge {
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .message {
+      min-height: 22px;
+      color: var(--warn);
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px 0;
+      background: #fbfcfd;
+    }
+
+    .tab {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    .tab.active {
+      color: #fff;
+      border-color: var(--accent);
+      background: var(--accent);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    code {
+      color: #0f5d4b;
+      font-family: Consolas, "Courier New", monospace;
+      word-break: break-word;
+    }
+
+    @media (max-width: 840px) {
+      header,
+      .app-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .stats,
+      .row,
+      .portrait-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>洛克王国世界速度工具</h1>
+        <p class="subtitle">本地保存精灵速度种族值，查询后自动记忆历史。公式按分步四舍五入计算。</p>
+      </div>
+      <div class="actions">
+        <button id="exportButton">导出数据</button>
+        <button id="resetButton" class="danger-button">恢复示例库</button>
+      </div>
+    </header>
+
+    <section class="app-grid">
+      <aside class="panel">
+        <div class="panel-head">
+          <h2>精灵资料库</h2>
+          <span class="badge" id="libraryCount">0只</span>
+        </div>
+        <div class="panel-body stack">
+          <div>
+            <label for="searchInput">搜索精灵</label>
+            <input id="searchInput" type="search" placeholder="输入名称或速度">
+          </div>
+          <div class="list" id="spiritList"></div>
+
+          <div class="row">
+            <div>
+              <label for="spiritName">精灵名称</label>
+              <input id="spiritName" placeholder="例如：迪莫">
+            </div>
+            <div>
+              <label for="baseSpeed">基础速度</label>
+              <input id="baseSpeed" type="number" min="0" step="1" value="130">
+            </div>
+          </div>
+
+          <div class="actions">
+            <button class="primary-button" id="saveSpiritButton">保存精灵</button>
+            <button id="newSpiritButton">新建</button>
+            <button class="danger-button" id="deleteSpiritButton">删除选中</button>
+          </div>
+          <p class="message" id="libraryMessage"></p>
+        </div>
+      </aside>
+
+      <section class="stack">
+        <section class="panel">
+          <div class="panel-head">
+            <h2>速度计算</h2>
+            <span class="badge" id="selectedSpiritLabel">未选择精灵</span>
+          </div>
+          <div class="panel-body">
+            <div class="portrait-row">
+              <img class="portrait" id="spiritPortrait" alt="" hidden>
+              <p class="hint" id="sourceLabel">资料库尚未自动更新时，会使用示例数据。运行“更新数据库.bat”后会载入完整图鉴数据。</p>
+            </div>
+            <div class="row">
+              <div>
+                <label for="individualValue">速度个体值</label>
+                <input id="individualValue" type="number" min="0" step="1" value="60">
+                <p class="hint">若按资质换算：个体值 = 6 × 资质。满资质 10 等于个体值 60。</p>
+              </div>
+              <div>
+                <label for="natureSelect">主要展示性格</label>
+                <select id="natureSelect">
+                  <option value="slow">减速性格 0.9</option>
+                  <option value="neutral">不变性格 1.0</option>
+                  <option value="fast" selected>加速性格 1.2</option>
+                </select>
+                <p class="hint">下方会同时给出三种性格，选项只影响高亮和历史记录。</p>
+              </div>
+            </div>
+
+            <div class="stats">
+              <div class="stat" data-nature="slow">
+                <span>减速性格 0.9</span>
+                <strong id="slowSpeed">-</strong>
+              </div>
+              <div class="stat" data-nature="neutral">
+                <span>不变性格 1.0</span>
+                <strong id="neutralSpeed">-</strong>
+              </div>
+              <div class="stat" data-nature="fast">
+                <span>加速性格 1.2</span>
+                <strong id="fastSpeed">-</strong>
+              </div>
+            </div>
+
+            <div class="actions">
+              <button class="primary-button" id="rememberButton">记录本次查询</button>
+              <button id="copyResultButton">复制结果</button>
+            </div>
+            <p class="message" id="calcMessage"></p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="tabs">
+            <button class="tab active" data-tab="detail">分步</button>
+            <button class="tab" data-tab="history">历史</button>
+            <button class="tab" data-tab="import">导入</button>
+          </div>
+          <div class="panel-body tab-panel active" id="detailPanel">
+            <table>
+              <tbody>
+                <tr>
+                  <th>公式</th>
+                  <td><code>round((round(1.1 × 基础速度) + round(0.55 × 个体值) + 10) × 性格修正) + 50</code></td>
+                </tr>
+                <tr>
+                  <th>基础速度项</th>
+                  <td id="basePart">-</td>
+                </tr>
+                <tr>
+                  <th>个体值项</th>
+                  <td id="ivPart">-</td>
+                </tr>
+                <tr>
+                  <th>性格前小计</th>
+                  <td id="subtotalPart">-</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="panel-body tab-panel" id="historyPanel">
+            <div class="actions" style="margin-bottom: 12px;">
+              <button id="clearHistoryButton" class="danger-button">清空历史</button>
+            </div>
+            <div class="list" id="historyList"></div>
+          </div>
+
+          <div class="panel-body tab-panel" id="importPanel">
+            <div class="stack">
+              <p class="hint">支持 JSON 数组或 CSV。字段可用：name/baseSpeed，或中文：名称/基础速度。导入会合并同名精灵。</p>
+              <textarea id="importText" placeholder='[{"name":"示例精灵","baseSpeed":100}]'></textarea>
+              <div class="actions">
+                <button class="primary-button" id="importButton">导入到资料库</button>
+                <button id="fillExampleButton">填入示例</button>
+              </div>
+              <p class="message" id="importMessage"></p>
+            </div>
+          </div>
+        </section>
+      </section>
+    </section>
+  </main>
+
+  <script src="data/spirits-db.js"></script>
+  <script>
+    const STORAGE_KEY = "roco-speed-tool:v2";
+
+    const fallbackSpirits = [
+      { name: "示例-65速精灵", baseSpeed: 65 },
+      { name: "示例-82速精灵", baseSpeed: 82 },
+      { name: "示例-105速精灵", baseSpeed: 105 },
+      { name: "示例-115速精灵", baseSpeed: 115 },
+      { name: "示例-125速精灵", baseSpeed: 125 },
+      { name: "示例-130速精灵", baseSpeed: 130 }
+    ];
+
+    const defaultSpirits = getBundledSpirits();
+
+    const state = loadState();
+    let selectedName = state.spirits[0]?.name || "";
+
+    const el = {
+      libraryCount: document.querySelector("#libraryCount"),
+      searchInput: document.querySelector("#searchInput"),
+      spiritList: document.querySelector("#spiritList"),
+      spiritName: document.querySelector("#spiritName"),
+      baseSpeed: document.querySelector("#baseSpeed"),
+      individualValue: document.querySelector("#individualValue"),
+      natureSelect: document.querySelector("#natureSelect"),
+      selectedSpiritLabel: document.querySelector("#selectedSpiritLabel"),
+      spiritPortrait: document.querySelector("#spiritPortrait"),
+      sourceLabel: document.querySelector("#sourceLabel"),
+      slowSpeed: document.querySelector("#slowSpeed"),
+      neutralSpeed: document.querySelector("#neutralSpeed"),
+      fastSpeed: document.querySelector("#fastSpeed"),
+      basePart: document.querySelector("#basePart"),
+      ivPart: document.querySelector("#ivPart"),
+      subtotalPart: document.querySelector("#subtotalPart"),
+      libraryMessage: document.querySelector("#libraryMessage"),
+      calcMessage: document.querySelector("#calcMessage"),
+      importMessage: document.querySelector("#importMessage"),
+      historyList: document.querySelector("#historyList"),
+      importText: document.querySelector("#importText")
+    };
+
+    function round(value) {
+      return Math.round(value);
+    }
+
+    function calculate(baseSpeed, individualValue, natureModifier) {
+      const basePart = round(baseSpeed * 1.1);
+      const ivPart = round(individualValue * 0.55);
+      const subtotal = basePart + ivPart + 10;
+      const speed = round(subtotal * natureModifier) + 50;
+      return { basePart, ivPart, subtotal, speed };
+    }
+
+    function loadState() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
+        if (saved && Array.isArray(saved.spirits)) {
+          return {
+            spirits: normalizeSpirits(saved.spirits),
+            history: Array.isArray(saved.history) ? saved.history : []
+          };
+        }
+      } catch (error) {
+        console.warn(error);
+      }
+      return { spirits: defaultSpirits, history: [] };
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    function normalizeSpirits(spirits) {
+      const map = new Map();
+      spirits.forEach((item) => {
+        const name = String(item.name || item["名称"] || "").trim();
+        const displayName = String(item.displayName || item["显示名称"] || name).trim();
+        const baseSpeed = Number(item.baseSpeed ?? item["基础速度"] ?? item.speed ?? item["速度"]);
+        if ((displayName || name) && Number.isFinite(baseSpeed) && baseSpeed >= 0) {
+          map.set(displayName || name, {
+            name: displayName || name,
+            originalName: item.originalName || item.name || name,
+            baseSpeed: round(baseSpeed),
+            image: item.image || item.localImage || item.portraitUrl || "",
+            pageUrl: item.pageUrl || "",
+            no: item.no || "",
+            stats: item.stats || null
+          });
+        }
+      });
+      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+    }
+
+    function selectedSpirit() {
+      return state.spirits.find((spirit) => spirit.name === selectedName) || null;
+    }
+
+    function renderAll() {
+      renderLibrary();
+      renderCalculator();
+      renderHistory();
+    }
+
+    function renderLibrary() {
+      const keyword = el.searchInput.value.trim().toLowerCase();
+      const spirits = state.spirits.filter((spirit) => {
+        return !keyword ||
+          spirit.name.toLowerCase().includes(keyword) ||
+          String(spirit.baseSpeed).includes(keyword);
+      });
+
+      el.libraryCount.textContent = `${state.spirits.length}只`;
+      el.spiritList.innerHTML = "";
+
+      if (!spirits.length) {
+        el.spiritList.innerHTML = `<button type="button"><span></span><span>没有匹配结果</span><span class="badge">可新增</span></button>`;
+        return;
+      }
+
+      spirits.forEach((spirit) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = spirit.name === selectedName ? "active" : "";
+        button.innerHTML = `${imageHtml(spirit.image, spirit.name)}<span>${escapeHtml(spirit.name)}</span><span class="badge">速 ${spirit.baseSpeed}</span>`;
+        button.addEventListener("click", () => {
+          selectedName = spirit.name;
+          el.spiritName.value = spirit.name;
+          el.baseSpeed.value = spirit.baseSpeed;
+          renderAll();
+        });
+        el.spiritList.appendChild(button);
+      });
+    }
+
+    function renderCalculator() {
+      const baseSpeed = Number(el.baseSpeed.value);
+      const individualValue = Number(el.individualValue.value);
+      const spirit = selectedSpirit();
+
+      el.selectedSpiritLabel.textContent = spirit ? `${spirit.name} · ${baseSpeed}速` : "手动输入";
+      if (spirit?.image) {
+        el.spiritPortrait.src = spirit.image;
+        el.spiritPortrait.alt = spirit.name;
+        el.spiritPortrait.hidden = false;
+      } else {
+        el.spiritPortrait.hidden = true;
+        el.spiritPortrait.removeAttribute("src");
+      }
+      el.sourceLabel.textContent = window.ROCO_SPIRITS_DB
+        ? `已载入自动数据库：${window.ROCO_SPIRITS_DB.count || state.spirits.length} 只，更新时间 ${formatTime(window.ROCO_SPIRITS_DB.updatedAt)}。`
+        : "资料库尚未自动更新时，会使用示例数据。运行“更新数据库.bat”后会载入完整图鉴数据。";
+      document.querySelectorAll(".stat").forEach((node) => {
+        node.classList.toggle("primary", node.dataset.nature === el.natureSelect.value);
+      });
+
+      if (!Number.isFinite(baseSpeed) || !Number.isFinite(individualValue) || baseSpeed < 0 || individualValue < 0) {
+        el.calcMessage.textContent = "请输入有效的基础速度和个体值。";
+        return;
+      }
+
+      el.calcMessage.textContent = "";
+      const slow = calculate(baseSpeed, individualValue, 0.9);
+      const neutral = calculate(baseSpeed, individualValue, 1);
+      const fast = calculate(baseSpeed, individualValue, 1.2);
+      const detail = calculate(baseSpeed, individualValue, natureModifier(el.natureSelect.value));
+
+      el.slowSpeed.textContent = slow.speed;
+      el.neutralSpeed.textContent = neutral.speed;
+      el.fastSpeed.textContent = fast.speed;
+      el.basePart.textContent = `round(${baseSpeed} × 1.1) = ${detail.basePart}`;
+      el.ivPart.textContent = `round(${individualValue} × 0.55) = ${detail.ivPart}`;
+      el.subtotalPart.textContent = `${detail.basePart} + ${detail.ivPart} + 10 = ${detail.subtotal}`;
+    }
+
+    function renderHistory() {
+      el.historyList.innerHTML = "";
+      if (!state.history.length) {
+        el.historyList.innerHTML = `<button type="button"><span></span><span>暂无查询记录</span><span class="badge">点击“记录本次查询”</span></button>`;
+        return;
+      }
+
+      state.history.slice(0, 80).forEach((item) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        const natureText = natureLabel(item.nature);
+        button.innerHTML = `<span>${escapeHtml(item.name)} · ${natureText} · ${item.result}速</span><span class="badge">B${item.baseSpeed} / IV${item.individualValue}</span>`;
+        button.addEventListener("click", () => {
+          selectedName = item.name;
+          el.spiritName.value = item.name;
+          el.baseSpeed.value = item.baseSpeed;
+          el.individualValue.value = item.individualValue;
+          el.natureSelect.value = item.nature;
+          renderAll();
+        });
+        el.historyList.appendChild(button);
+      });
+    }
+
+    function saveSpirit() {
+      const name = el.spiritName.value.trim();
+      const baseSpeed = Number(el.baseSpeed.value);
+
+      if (!name) {
+        el.libraryMessage.textContent = "请填写精灵名称。";
+        return;
+      }
+
+      if (!Number.isFinite(baseSpeed) || baseSpeed < 0) {
+        el.libraryMessage.textContent = "请填写有效的基础速度。";
+        return;
+      }
+
+      const existing = state.spirits.find((spirit) => spirit.name === name);
+      if (existing) {
+        existing.baseSpeed = round(baseSpeed);
+      } else {
+        state.spirits.push({ name, baseSpeed: round(baseSpeed), image: "" });
+      }
+
+      state.spirits = normalizeSpirits(state.spirits);
+      selectedName = name;
+      saveState();
+      el.libraryMessage.textContent = "已保存到本地资料库。";
+      renderAll();
+    }
+
+    function deleteSpirit() {
+      const name = el.spiritName.value.trim();
+      const before = state.spirits.length;
+      state.spirits = state.spirits.filter((spirit) => spirit.name !== name);
+
+      if (state.spirits.length === before) {
+        el.libraryMessage.textContent = "没有找到要删除的精灵。";
+        return;
+      }
+
+      selectedName = state.spirits[0]?.name || "";
+      const next = selectedSpirit();
+      el.spiritName.value = next?.name || "";
+      el.baseSpeed.value = next?.baseSpeed || 0;
+      saveState();
+      el.libraryMessage.textContent = "已删除。";
+      renderAll();
+    }
+
+    function rememberQuery() {
+      const name = el.spiritName.value.trim() || "未命名精灵";
+      const baseSpeed = Number(el.baseSpeed.value);
+      const individualValue = Number(el.individualValue.value);
+      const nature = el.natureSelect.value;
+      const result = calculate(baseSpeed, individualValue, natureModifier(nature)).speed;
+
+      state.history.unshift({
+        name,
+        baseSpeed: round(baseSpeed),
+        individualValue: round(individualValue),
+        nature,
+        result,
+        time: new Date().toISOString()
+      });
+      state.history = state.history.slice(0, 200);
+      saveState();
+      el.calcMessage.textContent = "已记住这次查询。";
+      renderHistory();
+    }
+
+    function parseImport(text) {
+      const trimmed = text.trim();
+      if (!trimmed) return [];
+
+      if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+        const parsed = JSON.parse(trimmed);
+        return normalizeSpirits(Array.isArray(parsed) ? parsed : [parsed]);
+      }
+
+      const lines = trimmed.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+      const rows = lines.map((line) => line.split(",").map((cell) => cell.trim()));
+      const hasHeader = rows[0]?.some((cell) => /name|名称|基础速度|baseSpeed/i.test(cell));
+      const header = hasHeader ? rows.shift() : ["name", "baseSpeed"];
+
+      return normalizeSpirits(rows.map((row) => {
+        const item = {};
+        header.forEach((key, index) => {
+          item[key] = row[index];
+        });
+        return item;
+      }));
+    }
+
+    function importSpirits() {
+      try {
+        const incoming = parseImport(el.importText.value);
+        if (!incoming.length) {
+          el.importMessage.textContent = "没有识别到可导入的数据。";
+          return;
+        }
+        state.spirits = normalizeSpirits([...state.spirits, ...incoming]);
+        saveState();
+        el.importMessage.textContent = `已导入 ${incoming.length} 条，当前资料库 ${state.spirits.length} 只。`;
+        renderAll();
+      } catch (error) {
+        el.importMessage.textContent = `导入失败：${error.message}`;
+      }
+    }
+
+    function exportData() {
+      const data = JSON.stringify(state, null, 2);
+      navigator.clipboard?.writeText(data).then(() => {
+        el.libraryMessage.textContent = "数据已复制到剪贴板。";
+      }).catch(() => {
+        el.libraryMessage.textContent = "浏览器不允许复制，已在导入框显示导出数据。";
+        el.importText.value = data;
+        switchTab("import");
+      });
+    }
+
+    function copyResult() {
+      const name = el.spiritName.value.trim() || "未命名精灵";
+      const baseSpeed = Number(el.baseSpeed.value);
+      const individualValue = Number(el.individualValue.value);
+      const slow = calculate(baseSpeed, individualValue, 0.9).speed;
+      const neutral = calculate(baseSpeed, individualValue, 1).speed;
+      const fast = calculate(baseSpeed, individualValue, 1.2).speed;
+      const text = `${name}：基础速度${baseSpeed}，个体值${individualValue}；减速${slow}，不变${neutral}，加速${fast}`;
+
+      navigator.clipboard?.writeText(text).then(() => {
+        el.calcMessage.textContent = "结果已复制。";
+      }).catch(() => {
+        el.calcMessage.textContent = text;
+      });
+    }
+
+    function resetLibrary() {
+      state.spirits = defaultSpirits.slice();
+      state.history = [];
+      selectedName = state.spirits[0].name;
+      el.spiritName.value = selectedName;
+      el.baseSpeed.value = state.spirits[0].baseSpeed;
+      saveState();
+      renderAll();
+    }
+
+    function switchTab(name) {
+      document.querySelectorAll(".tab").forEach((tab) => {
+        tab.classList.toggle("active", tab.dataset.tab === name);
+      });
+      document.querySelectorAll(".tab-panel").forEach((panel) => {
+        panel.classList.toggle("active", panel.id === `${name}Panel`);
+      });
+    }
+
+    function natureModifier(nature) {
+      return { slow: 0.9, neutral: 1, fast: 1.2 }[nature] || 1;
+    }
+
+    function natureLabel(nature) {
+      return { slow: "减速", neutral: "不变", fast: "加速" }[nature] || "不变";
+    }
+
+    function getBundledSpirits() {
+      if (window.ROCO_SPIRITS_DB?.spirits?.length) {
+        return window.ROCO_SPIRITS_DB.spirits.map((spirit) => ({
+          name: spirit.displayName || spirit.name,
+          originalName: spirit.name,
+          baseSpeed: spirit.baseSpeed,
+          image: spirit.localImage || spirit.portraitUrl || "",
+          pageUrl: spirit.pageUrl || "",
+          no: spirit.no || "",
+          stats: spirit.stats || null
+        }));
+      }
+      return fallbackSpirits;
+    }
+
+    function imageHtml(src, alt) {
+      if (!src) return `<span class="thumb"></span>`;
+      return `<img class="thumb" src="${escapeHtml(src)}" alt="${escapeHtml(alt)}">`;
+    }
+
+    function formatTime(value) {
+      if (!value) return "未知";
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return value;
+      return date.toLocaleString("zh-CN");
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    document.querySelector("#saveSpiritButton").addEventListener("click", saveSpirit);
+    document.querySelector("#deleteSpiritButton").addEventListener("click", deleteSpirit);
+    document.querySelector("#newSpiritButton").addEventListener("click", () => {
+      selectedName = "";
+      el.spiritName.value = "";
+      el.baseSpeed.value = 0;
+      renderAll();
+    });
+    document.querySelector("#rememberButton").addEventListener("click", rememberQuery);
+    document.querySelector("#copyResultButton").addEventListener("click", copyResult);
+    document.querySelector("#clearHistoryButton").addEventListener("click", () => {
+      state.history = [];
+      saveState();
+      renderHistory();
+    });
+    document.querySelector("#importButton").addEventListener("click", importSpirits);
+    document.querySelector("#fillExampleButton").addEventListener("click", () => {
+      el.importText.value = "名称,基础速度\n迪莫,120\n示例精灵,100";
+    });
+    document.querySelector("#exportButton").addEventListener("click", exportData);
+    document.querySelector("#resetButton").addEventListener("click", resetLibrary);
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => switchTab(tab.dataset.tab));
+    });
+
+    ["input", "change"].forEach((eventName) => {
+      el.searchInput.addEventListener(eventName, renderLibrary);
+      el.baseSpeed.addEventListener(eventName, renderCalculator);
+      el.individualValue.addEventListener(eventName, renderCalculator);
+      el.natureSelect.addEventListener(eventName, renderCalculator);
+      el.spiritName.addEventListener(eventName, () => {
+        selectedName = el.spiritName.value.trim();
+        renderCalculator();
+      });
+    });
+
+    const first = selectedSpirit();
+    if (first) {
+      el.spiritName.value = first.name;
+      el.baseSpeed.value = first.baseSpeed;
+    }
+    renderAll();
+  </script>
+</body>
+</html>
