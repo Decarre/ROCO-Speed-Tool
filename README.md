@@ -6,6 +6,7 @@
 
 - 按公式计算减速、不变、加速三种性格速度
 - 从 BWiki 精灵图鉴自动抓取精灵名称、立绘链接和种族值
+- 从 BWiki 技能图鉴自动抓取加速技能，并记录每只精灵可使用的加速技能
 - 搜索本地精灵资料库
 - 自动记住查询历史
 - 支持导入/导出 JSON 或 CSV 数据
@@ -15,8 +16,10 @@
 ```text
 双击 启动速度工具.bat：先自动更新数据库，再打开工具
 双击 更新数据库.bat：只更新数据库
-node scripts\update-db.js：更新数据库并下载立绘到 data/images
-node scripts\update-db.js --no-images：只更新种族值和远程立绘链接
+node scripts\update-db.js：更新精灵和技能数据库，并下载立绘到 data/images
+node scripts\update-db.js --no-images：更新精灵和技能数据库，只使用远程立绘链接
+node scripts\update-db.js --skills-only --no-images：只更新加速技能映射
+node scripts\update-db.js --spirits-only --no-images：只更新精灵种族值
 ```
 
 生成文件：
@@ -24,6 +27,8 @@ node scripts\update-db.js --no-images：只更新种族值和远程立绘链接
 ```text
 data/spirits-db.json
 data/spirits-db.js
+data/skills-db.json
+data/skills-db.js
 data/images/
 ```
 

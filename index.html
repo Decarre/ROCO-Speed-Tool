@@ -188,7 +188,7 @@
 
     .stats {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 14px;
     }
@@ -363,7 +363,7 @@
     <header>
       <div>
         <h1>洛克王国世界速度工具</h1>
-        <p class="subtitle">本地保存精灵速度种族值，查询后自动记忆历史。公式按分步四舍五入计算。</p>
+        <p class="subtitle">本地保存精灵速度种族值和加速技能，查询后自动记忆历史。公式按分步四舍五入计算。</p>
       </div>
       <div class="actions">
         <button id="exportButton">导出数据</button>
@@ -432,6 +432,14 @@
               </div>
             </div>
 
+            <div style="margin: 14px 0;">
+              <label for="skillSelect">加速技能</label>
+              <select id="skillSelect">
+                <option value="0">不使用技能</option>
+              </select>
+              <p class="hint" id="skillHint">技能数据来自 BWiki 技能图鉴，只显示效果文本中包含“速度+数字”的技能。</p>
+            </div>
+
             <div class="stats">
               <div class="stat" data-nature="slow">
                 <span>减速性格 0.9</span>
@@ -444,6 +452,10 @@
               <div class="stat" data-nature="fast">
                 <span>加速性格 1.2</span>
                 <strong id="fastSpeed">-</strong>
+              </div>
+              <div class="stat primary" data-nature="skill">
+                <span id="boostedLabel">技能后速度</span>
+                <strong id="boostedSpeed">-</strong>
               </div>
             </div>
 
@@ -480,6 +492,10 @@
                   <th>性格前小计</th>
                   <td id="subtotalPart">-</td>
                 </tr>
+                <tr>
+                  <th>技能加速</th>
+                  <td id="skillPart">-</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -508,6 +524,7 @@
   </main>
 
   <script src="data/spirits-db.js"></script>
+  <script src="data/skills-db.js"></script>
   <script>
     const STORAGE_KEY = "roco-speed-tool:v2";
 
@@ -521,6 +538,7 @@
     ];
 
     const defaultSpirits = getBundledSpirits();
+    const speedSkills = getBundledSpeedSkills();
 
     const state = loadState();
     let selectedName = state.spirits[0]?.name || "";
@@ -533,15 +551,20 @@
       baseSpeed: document.querySelector("#baseSpeed"),
       individualValue: document.querySelector("#individualValue"),
       natureSelect: document.querySelector("#natureSelect"),
+      skillSelect: document.querySelector("#skillSelect"),
+      skillHint: document.querySelector("#skillHint"),
       selectedSpiritLabel: document.querySelector("#selectedSpiritLabel"),
       spiritPortrait: document.querySelector("#spiritPortrait"),
       sourceLabel: document.querySelector("#sourceLabel"),
       slowSpeed: document.querySelector("#slowSpeed"),
       neutralSpeed: document.querySelector("#neutralSpeed"),
       fastSpeed: document.querySelector("#fastSpeed"),
+      boostedLabel: document.querySelector("#boostedLabel"),
+      boostedSpeed: document.querySelector("#boostedSpeed"),
       basePart: document.querySelector("#basePart"),
       ivPart: document.querySelector("#ivPart"),
       subtotalPart: document.querySelector("#subtotalPart"),
+      skillPart: document.querySelector("#skillPart"),
       libraryMessage: document.querySelector("#libraryMessage"),
       calcMessage: document.querySelector("#calcMessage"),
       importMessage: document.querySelector("#importMessage"),
@@ -566,7 +589,7 @@
         const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
         if (saved && Array.isArray(saved.spirits)) {
           return {
-            spirits: normalizeSpirits(saved.spirits),
+            spirits: mergeSpiritLists(defaultSpirits, normalizeSpirits(saved.spirits)),
             history: Array.isArray(saved.history) ? saved.history : []
           };
         }
@@ -574,6 +597,24 @@
         console.warn(error);
       }
       return { spirits: defaultSpirits, history: [] };
+    }
+
+    function mergeSpiritLists(sourceSpirits, savedSpirits) {
+      const map = new Map();
+      sourceSpirits.forEach((spirit) => map.set(spirit.name, { ...spirit }));
+      savedSpirits.forEach((spirit) => {
+        const source = map.get(spirit.name);
+        map.set(spirit.name, {
+          ...(source || {}),
+          ...spirit,
+          image: spirit.image || source?.image || "",
+          pageUrl: spirit.pageUrl || source?.pageUrl || "",
+          no: spirit.no || source?.no || "",
+          stats: spirit.stats || source?.stats || null,
+          speedSkills: spirit.speedSkills?.length ? spirit.speedSkills : (source?.speedSkills || [])
+        });
+      });
+      return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
     }
 
     function saveState() {
@@ -594,7 +635,8 @@
             image: item.image || item.localImage || item.portraitUrl || "",
             pageUrl: item.pageUrl || "",
             no: item.no || "",
-            stats: item.stats || null
+            stats: item.stats || null,
+            speedSkills: Array.isArray(item.speedSkills) ? item.speedSkills : []
           });
         }
       });
@@ -646,6 +688,7 @@
       const baseSpeed = Number(el.baseSpeed.value);
       const individualValue = Number(el.individualValue.value);
       const spirit = selectedSpirit();
+      renderSkillOptions();
 
       el.selectedSpiritLabel.textContent = spirit ? `${spirit.name} · ${baseSpeed}速` : "手动输入";
       if (spirit?.image) {
@@ -657,7 +700,7 @@
         el.spiritPortrait.removeAttribute("src");
       }
       el.sourceLabel.textContent = window.ROCO_SPIRITS_DB
-        ? `已载入自动数据库：${window.ROCO_SPIRITS_DB.count || state.spirits.length} 只，更新时间 ${formatTime(window.ROCO_SPIRITS_DB.updatedAt)}。`
+        ? `已载入自动数据库：${window.ROCO_SPIRITS_DB.count || state.spirits.length} 只精灵，${speedSkills.length} 个加速技能，更新时间 ${formatTime(window.ROCO_SPIRITS_DB.updatedAt)}。`
         : "资料库尚未自动更新时，会使用示例数据。运行“更新数据库.bat”后会载入完整图鉴数据。";
       document.querySelectorAll(".stat").forEach((node) => {
         node.classList.toggle("primary", node.dataset.nature === el.natureSelect.value);
@@ -673,13 +716,22 @@
       const neutral = calculate(baseSpeed, individualValue, 1);
       const fast = calculate(baseSpeed, individualValue, 1.2);
       const detail = calculate(baseSpeed, individualValue, natureModifier(el.natureSelect.value));
+      const selectedSkill = parseSelectedSkill();
+      const boosted = detail.speed + selectedSkill.speedBonus;
 
       el.slowSpeed.textContent = slow.speed;
       el.neutralSpeed.textContent = neutral.speed;
       el.fastSpeed.textContent = fast.speed;
+      el.boostedLabel.textContent = selectedSkill.speedBonus > 0
+        ? `${natureLabel(el.natureSelect.value)} + ${selectedSkill.name}`
+        : `${natureLabel(el.natureSelect.value)}，无技能`;
+      el.boostedSpeed.textContent = boosted;
       el.basePart.textContent = `round(${baseSpeed} × 1.1) = ${detail.basePart}`;
       el.ivPart.textContent = `round(${individualValue} × 0.55) = ${detail.ivPart}`;
       el.subtotalPart.textContent = `${detail.basePart} + ${detail.ivPart} + 10 = ${detail.subtotal}`;
+      el.skillPart.textContent = selectedSkill.speedBonus > 0
+        ? `${detail.speed} + ${selectedSkill.speedBonus} = ${boosted}（${selectedSkill.name}：${selectedSkill.label}）`
+        : `${detail.speed} + 0 = ${boosted}`;
     }
 
     function renderHistory() {
@@ -693,13 +745,15 @@
         const button = document.createElement("button");
         button.type = "button";
         const natureText = natureLabel(item.nature);
-        button.innerHTML = `<span>${escapeHtml(item.name)} · ${natureText} · ${item.result}速</span><span class="badge">B${item.baseSpeed} / IV${item.individualValue}</span>`;
+        const skillText = item.skillName ? ` · ${item.skillName}` : "";
+        button.innerHTML = `<span>${escapeHtml(item.name)} · ${natureText}${skillText} · ${item.result}速</span><span class="badge">B${item.baseSpeed} / IV${item.individualValue}</span>`;
         button.addEventListener("click", () => {
           selectedName = item.name;
           el.spiritName.value = item.name;
           el.baseSpeed.value = item.baseSpeed;
           el.individualValue.value = item.individualValue;
           el.natureSelect.value = item.nature;
+          el.skillSelect.value = item.skillValue || "0";
           renderAll();
         });
         el.historyList.appendChild(button);
@@ -758,13 +812,18 @@
       const baseSpeed = Number(el.baseSpeed.value);
       const individualValue = Number(el.individualValue.value);
       const nature = el.natureSelect.value;
-      const result = calculate(baseSpeed, individualValue, natureModifier(nature)).speed;
+      const selectedSkill = parseSelectedSkill();
+      const baseResult = calculate(baseSpeed, individualValue, natureModifier(nature)).speed;
+      const result = baseResult + selectedSkill.speedBonus;
 
       state.history.unshift({
         name,
         baseSpeed: round(baseSpeed),
         individualValue: round(individualValue),
         nature,
+        skillValue: el.skillSelect.value,
+        skillName: selectedSkill.speedBonus > 0 ? selectedSkill.name : "",
+        skillBonus: selectedSkill.speedBonus,
         result,
         time: new Date().toISOString()
       });
@@ -831,7 +890,13 @@
       const slow = calculate(baseSpeed, individualValue, 0.9).speed;
       const neutral = calculate(baseSpeed, individualValue, 1).speed;
       const fast = calculate(baseSpeed, individualValue, 1.2).speed;
-      const text = `${name}：基础速度${baseSpeed}，个体值${individualValue}；减速${slow}，不变${neutral}，加速${fast}`;
+      const selectedSkill = parseSelectedSkill();
+      const selectedNatureSpeed = calculate(baseSpeed, individualValue, natureModifier(el.natureSelect.value)).speed;
+      const boosted = selectedNatureSpeed + selectedSkill.speedBonus;
+      const skillText = selectedSkill.speedBonus > 0
+        ? `；${natureLabel(el.natureSelect.value)}使用${selectedSkill.name}后${boosted}`
+        : "";
+      const text = `${name}：基础速度${baseSpeed}，个体值${individualValue}；减速${slow}，不变${neutral}，加速${fast}${skillText}`;
 
       navigator.clipboard?.writeText(text).then(() => {
         el.calcMessage.textContent = "结果已复制。";
@@ -867,6 +932,43 @@
       return { slow: "减速", neutral: "不变", fast: "加速" }[nature] || "不变";
     }
 
+    function renderSkillOptions() {
+      const previousValue = el.skillSelect.value;
+      const spirit = selectedSpirit();
+      const availableSkills = spirit ? (spirit.speedSkills || []) : speedSkills;
+
+      el.skillSelect.innerHTML = `<option value="0">不使用技能</option>`;
+      availableSkills.forEach((skill) => {
+        skill.variants.forEach((variant, index) => {
+          const option = document.createElement("option");
+          option.value = `${skill.name}|${variant.label}|${variant.speedBonus}`;
+          option.textContent = index === 0
+            ? `${skill.name}：速度 +${variant.speedBonus}`
+            : `${skill.name} / ${variant.label}：速度 +${variant.speedBonus}`;
+          option.dataset.effect = skill.effect;
+          el.skillSelect.appendChild(option);
+        });
+      });
+      if ([...el.skillSelect.options].some((option) => option.value === previousValue)) {
+        el.skillSelect.value = previousValue;
+      }
+      el.skillHint.textContent = speedSkills.length
+        ? `已载入 ${speedSkills.length} 个加速技能；当前${spirit ? "精灵" : "手动输入"}可用 ${Math.max(0, el.skillSelect.options.length - 1)} 项。`
+        : "尚未载入技能数据库，运行“更新数据库.bat”后会自动抓取技能。";
+    }
+
+    function parseSelectedSkill() {
+      if (!el.skillSelect.value || el.skillSelect.value === "0") {
+        return { name: "无技能", label: "无", speedBonus: 0 };
+      }
+      const [name, label, bonus] = el.skillSelect.value.split("|");
+      return {
+        name,
+        label,
+        speedBonus: Number(bonus) || 0
+      };
+    }
+
     function getBundledSpirits() {
       if (window.ROCO_SPIRITS_DB?.spirits?.length) {
         return window.ROCO_SPIRITS_DB.spirits.map((spirit) => ({
@@ -876,10 +978,33 @@
           image: spirit.localImage || spirit.portraitUrl || "",
           pageUrl: spirit.pageUrl || "",
           no: spirit.no || "",
-          stats: spirit.stats || null
+          stats: spirit.stats || null,
+          speedSkills: Array.isArray(spirit.speedSkills) ? spirit.speedSkills : []
         }));
       }
       return fallbackSpirits;
+    }
+
+    function getBundledSpeedSkills() {
+      if (window.ROCO_SKILLS_DB?.skills?.length) {
+        return window.ROCO_SKILLS_DB.skills
+          .filter((skill) => Array.isArray(skill.variants) && skill.variants.length)
+          .map((skill) => ({
+            name: skill.name,
+            effect: skill.effect || "",
+            variants: skill.variants
+          }));
+      }
+      return [
+        {
+          name: "快速移动",
+          effect: "自己获得速度+80，应对防御：改为速度+160。",
+          variants: [
+            { label: "默认", speedBonus: 80 },
+            { label: "应对防御", speedBonus: 160 }
+          ]
+        }
+      ];
     }
 
     function imageHtml(src, alt) {
@@ -933,6 +1058,7 @@
       el.baseSpeed.addEventListener(eventName, renderCalculator);
       el.individualValue.addEventListener(eventName, renderCalculator);
       el.natureSelect.addEventListener(eventName, renderCalculator);
+      el.skillSelect.addEventListener(eventName, renderCalculator);
       el.spiritName.addEventListener(eventName, () => {
         selectedName = el.spiritName.value.trim();
         renderCalculator();
@@ -944,6 +1070,7 @@
       el.spiritName.value = first.name;
       el.baseSpeed.value = first.baseSpeed;
     }
+    renderSkillOptions();
     renderAll();
   </script>
 </body>

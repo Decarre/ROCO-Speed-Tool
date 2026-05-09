@@ -1,0 +1,89 @@
+window.ROCO_SKILLS_DB = {
+  "source": "https://wiki.biligame.com/rocom/%E6%8A%80%E8%83%BD%E5%9B%BE%E9%89%B4",
+  "licenseNote": "数据来源：洛克王国:手游WIKI_BWIKI。WIKI 页面声明文本数据采用 CC BY-NC-SA 4.0，请按其要求署名并用于非商业用途。",
+  "updatedAt": "2026-05-09T12:10:21.811Z",
+  "count": 7,
+  "skills": [
+    {
+      "name": "超导加速",
+      "effect": "造成魔伤，自己获得速度+30。&#160;",
+      "variants": [
+        {
+          "label": "默认",
+          "speedBonus": 30
+        }
+      ],
+      "pageUrl": "https://wiki.biligame.com/rocom/%E8%B6%85%E5%AF%BC%E5%8A%A0%E9%80%9F"
+    },
+    {
+      "name": "嘲弄",
+      "effect": "自己获得魔攻+90%，若敌方本回合更换精灵，自己获得速度+70。&#160;",
+      "variants": [
+        {
+          "label": "默认",
+          "speedBonus": 70
+        }
+      ],
+      "pageUrl": "https://wiki.biligame.com/rocom/%E5%98%B2%E5%BC%84"
+    },
+    {
+      "name": "乘风",
+      "effect": "自己获得速度+120。&#160;",
+      "variants": [
+        {
+          "label": "默认",
+          "speedBonus": 120
+        }
+      ],
+      "pageUrl": "https://wiki.biligame.com/rocom/%E4%B9%98%E9%A3%8E"
+    },
+    {
+      "name": "快速移动",
+      "effect": "自己获得速度+80，应对防御：改为速度+160。&#160;",
+      "variants": [
+        {
+          "label": "默认",
+          "speedBonus": 80
+        },
+        {
+          "label": "应对防御",
+          "speedBonus": 160
+        }
+      ],
+      "pageUrl": "https://wiki.biligame.com/rocom/%E5%BF%AB%E9%80%9F%E7%A7%BB%E5%8A%A8"
+    },
+    {
+      "name": "龙吟",
+      "effect": "蓄力，自己获得双攻+100%和速度+60。&#160;",
+      "variants": [
+        {
+          "label": "默认",
+          "speedBonus": 60
+        }
+      ],
+      "pageUrl": "https://wiki.biligame.com/rocom/%E9%BE%99%E5%90%9F"
+    },
+    {
+      "name": "啮合传递",
+      "effect": "自己获得速度+80，本技能位于1号或3号位时额外获得物攻+60%，传动1。&#160;",
+      "variants": [
+        {
+          "label": "默认",
+          "speedBonus": 80
+        }
+      ],
+      "pageUrl": "https://wiki.biligame.com/rocom/%E5%95%AE%E5%90%88%E4%BC%A0%E9%80%92"
+    },
+    {
+      "name": "玩具乐园",
+      "effect": "自身及背包里的精灵获得萌化，并提升30%攻防，速度+20。&#160;",
+      "variants": [
+        {
+          "label": "默认",
+          "speedBonus": 20
+        }
+      ],
+      "pageUrl": "https://wiki.biligame.com/rocom/%E7%8E%A9%E5%85%B7%E4%B9%90%E5%9B%AD"
+    }
+  ]
+};

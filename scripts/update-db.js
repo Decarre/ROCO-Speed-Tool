@@ -10,14 +10,20 @@ const DATA_DIR = path.join(ROOT, "data");
 const IMAGE_DIR = path.join(DATA_DIR, "images");
 const JSON_PATH = path.join(DATA_DIR, "spirits-db.json");
 const JS_PATH = path.join(DATA_DIR, "spirits-db.js");
+const SKILLS_JSON_PATH = path.join(DATA_DIR, "skills-db.json");
+const SKILLS_JS_PATH = path.join(DATA_DIR, "skills-db.js");
 const INDEX_URL = "https://wiki.biligame.com/rocom/%E7%B2%BE%E7%81%B5%E5%9B%BE%E9%89%B4";
+const SKILL_INDEX_URL = "https://wiki.biligame.com/rocom/%E6%8A%80%E8%83%BD%E5%9B%BE%E9%89%B4";
 const BASE_URL = "https://wiki.biligame.com";
+const LICENSE_NOTE = "数据来源：洛克王国:手游WIKI_BWIKI。WIKI 页面声明文本数据采用 CC BY-NC-SA 4.0，请按其要求署名并用于非商业用途。";
 const MAX_CONCURRENCY = 2;
 const REQUEST_DELAY_MS = 700;
 const RETRY_STATUSES = new Set([429, 500, 502, 503, 504, 567]);
 
 const args = new Set(process.argv.slice(2));
 const shouldDownloadImages = !args.has("--no-images");
+const shouldUpdateSpirits = !args.has("--skills-only");
+const shouldUpdateSkills = !args.has("--spirits-only");
 
 main().catch((error) => {
   console.error(`更新失败：${error.stack || error.message}`);
@@ -28,6 +34,16 @@ async function main() {
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.mkdir(IMAGE_DIR, { recursive: true });
 
+  if (shouldUpdateSpirits) {
+    await updateSpirits();
+  }
+
+  if (shouldUpdateSkills) {
+    await updateSkills();
+  }
+}
+
+async function updateSpirits() {
   console.log("正在读取精灵图鉴首页...");
   const indexHtml = await fetchText(INDEX_URL);
   const indexEntries = parseIndex(indexHtml);
@@ -64,7 +80,7 @@ async function main() {
 
   const database = {
     source: INDEX_URL,
-    licenseNote: "数据来源：洛克王国:手游WIKI_BWIKI。WIKI 页面声明文本数据采用 CC BY-NC-SA 4.0，请按其要求署名并用于非商业用途。",
+    licenseNote: LICENSE_NOTE,
     updatedAt: new Date().toISOString(),
     count: sorted.length,
     spirits: sorted
@@ -79,6 +95,47 @@ async function main() {
 
   console.log(`完成：已生成 ${JSON_PATH}`);
   console.log(`完成：已生成 ${JS_PATH}`);
+}
+
+async function updateSkills() {
+  console.log("正在读取技能图鉴首页...");
+  const skillIndexHtml = await fetchText(SKILL_INDEX_URL);
+  const skillEntries = parseSkillIndex(skillIndexHtml);
+  console.log(`技能图鉴首页解析到 ${skillEntries.length} 个候选技能，开始筛选速度技能...`);
+
+  const skills = [];
+  await mapLimit(skillEntries, MAX_CONCURRENCY, async (entry, index) => {
+    await sleep((index % MAX_CONCURRENCY) * REQUEST_DELAY_MS);
+    try {
+      const detail = await scrapeSkillDetail(entry);
+      if (detail) {
+        skills.push(detail);
+        console.log(`✓ 技能 ${detail.name} ${detail.variants.map((item) => `+${item.speedBonus}`).join("/")}`);
+      }
+    } catch (error) {
+      console.warn(`跳过技能：${entry.name} ${error.message}`);
+    }
+  });
+
+  const sortedSkills = skills.sort((a, b) => a.name.localeCompare(b.name, "zh-Hans-CN"));
+  const skillDatabase = {
+    source: SKILL_INDEX_URL,
+    licenseNote: LICENSE_NOTE,
+    updatedAt: new Date().toISOString(),
+    count: sortedSkills.length,
+    skills: sortedSkills
+  };
+
+  await fs.writeFile(SKILLS_JSON_PATH, JSON.stringify(skillDatabase, null, 2), "utf8");
+  await fs.writeFile(
+    SKILLS_JS_PATH,
+    `window.ROCO_SKILLS_DB = ${JSON.stringify(skillDatabase, null, 2)};\n`,
+    "utf8"
+  );
+
+  console.log(`完成：已生成 ${SKILLS_JSON_PATH}`);
+  console.log(`完成：已生成 ${SKILLS_JS_PATH}`);
+  await attachSpeedSkillsToSpirits(skillDatabase);
 }
 
 async function scrapeDetail(entry) {
@@ -98,6 +155,7 @@ async function scrapeDetail(entry) {
     displayName: entry.displayName,
     baseSpeed: stats.speed,
     stats,
+    skillNames: parseSpiritSkillNames(html),
     portraitUrl,
     localImage,
     pageUrl: entry.url
@@ -156,6 +214,176 @@ function parseIndex(html) {
   }
 
   return entries;
+}
+
+function parseSkillIndex(html) {
+  const entries = [];
+  const seen = new Set();
+  const anchorRegex = /<a\b[^>]*href="([^"]*\/rocom\/[^"#?]+)"[^>]*>([\s\S]*?)<\/a>/g;
+  let match;
+
+  while ((match = anchorRegex.exec(html))) {
+    const href = decodeHtml(match[1]);
+    const name = cleanText(match[2]);
+    if (!name || isIgnoredLinkText(name) || /^NO\./i.test(name) || seen.has(name)) continue;
+    if (/图鉴|筛选|WIKI|页面|历史|编辑|刷新|地图|工具|攻略|贡献|设置|分类|用户|文件|模板|模块|帮助/.test(name)) continue;
+
+    const nearbyHtml = html.slice(Math.max(0, match.index - 350), Math.min(html.length, match.index + 350));
+    if (!/技能图标|图标 技能/.test(decodeHtml(nearbyHtml))) continue;
+
+    seen.add(name);
+    entries.push({
+      name,
+      url: absoluteUrl(href)
+    });
+  }
+
+  return entries;
+}
+
+async function scrapeSkillDetail(entry) {
+  const html = await fetchText(entry.url);
+  const text = htmlToText(html);
+  if (!text.includes("技能威力")) return null;
+
+  const effect = parseSkillEffect(text);
+  const variants = parseSpeedBoostVariants(effect);
+  if (!variants.length) return null;
+
+  return {
+    name: entry.name,
+    effect,
+    variants,
+    pageUrl: entry.url
+  };
+}
+
+function parseSkillEffect(text) {
+  const normalized = text.replace(/\n+/g, "\n");
+  const markIndex = normalized.indexOf("✦");
+  if (markIndex >= 0) {
+    const afterMark = normalized.slice(markIndex + 1, markIndex + 240);
+    return afterMark
+      .split(/\n可以学会的精灵|\n取自|\n分类/)[0]
+      .replace(/\n+/g, "")
+      .trim();
+  }
+
+  const speedIndex = normalized.indexOf("速度+");
+  if (speedIndex >= 0) {
+    return normalized.slice(Math.max(0, speedIndex - 60), speedIndex + 180)
+      .replace(/\n+/g, "")
+      .trim();
+  }
+
+  return "";
+}
+
+function parseSpeedBoostVariants(effect) {
+  const variants = [];
+  const regex = /速度\s*\+\s*(\d+)/g;
+  let match;
+  let index = 0;
+
+  while ((match = regex.exec(effect))) {
+    const speedBonus = Number(match[1]);
+    if (!Number.isFinite(speedBonus) || speedBonus <= 0) continue;
+
+    const label = index === 0 ? "默认" : labelBefore(effect, match.index);
+    if (!variants.some((item) => item.speedBonus === speedBonus && item.label === label)) {
+      variants.push({ label, speedBonus });
+    }
+    index += 1;
+  }
+
+  return variants;
+}
+
+async function attachSpeedSkillsToSpirits(skillDatabase) {
+  let database;
+  try {
+    database = JSON.parse(await fs.readFile(JSON_PATH, "utf8"));
+  } catch {
+    return;
+  }
+
+  if (!database?.spirits?.length) return;
+
+  const skillByName = new Map(skillDatabase.skills.map((skill) => [skill.name, skill]));
+  for (const spirit of database.spirits) {
+    const skillNames = Array.isArray(spirit.skillNames) ? spirit.skillNames : [];
+    spirit.speedSkills = skillNames
+      .map((name) => skillByName.get(name))
+      .filter(Boolean)
+      .map((skill) => ({
+        name: skill.name,
+        effect: skill.effect,
+        variants: skill.variants,
+        pageUrl: skill.pageUrl
+      }));
+  }
+
+  database.updatedAt = new Date().toISOString();
+  await fs.writeFile(JSON_PATH, JSON.stringify(database, null, 2), "utf8");
+  await fs.writeFile(
+    JS_PATH,
+    `window.ROCO_SPIRITS_DB = ${JSON.stringify(database, null, 2)};\n`,
+    "utf8"
+  );
+  console.log(`完成：已把加速技能写入 ${JSON_PATH}`);
+}
+
+function parseSpiritSkillNames(html) {
+  const decoded = decodeURIComponentSafe(decodeHtml(html));
+  const mainStart = decoded.indexOf("精灵属性");
+  const source = mainStart >= 0 ? decoded.slice(mainStart) : decoded;
+  const endCandidates = ["取自“", "分类", "catlinks"];
+  const end = endCandidates
+    .map((marker) => source.indexOf(marker))
+    .filter((index) => index > 0)
+    .sort((a, b) => a - b)[0] || source.length;
+  const section = source.slice(0, end);
+  const names = new Set();
+  const imageRegex = /(?:alt|title)="技能图标\s+([^"]+)"/g;
+  let match;
+
+  while ((match = imageRegex.exec(section))) {
+    const name = cleanSkillName(match[1]);
+    if (name && !isIgnoredSkillName(name)) names.add(name);
+  }
+
+  const linkRegex = /<a\b[^>]*href="\/rocom\/([^"#?]+)"[^>]*>([\s\S]*?)<\/a>/g;
+  while ((match = linkRegex.exec(section))) {
+    const hrefName = cleanSkillName(decodeURIComponentSafe(match[1]).replace(/_/g, " "));
+    const textName = cleanSkillName(cleanText(match[2]));
+    const name = textName || hrefName;
+    if (name && !isIgnoredSkillName(name)) names.add(name);
+  }
+
+  return Array.from(names);
+}
+
+function cleanSkillName(value) {
+  return String(value || "")
+    .replace(/\.(?:png|jpg|jpeg|webp)$/i, "")
+    .replace(/^技能图标\s*/, "")
+    .replace(/_/g, " ")
+    .trim();
+}
+
+function isIgnoredSkillName(name) {
+  return /^(普通|草|火|水|光|地|冰|龙|电|毒|虫|武|翼|萌|幽|恶|机械|幻|物攻|魔攻|状态|防御|星星背景)$/.test(name);
+}
+
+function labelBefore(effect, matchIndex) {
+  const before = effect.slice(0, matchIndex);
+  const parts = before.split(/[。；;]/);
+  const clause = parts[parts.length - 1] || "";
+  const segment = clause.split(/[，,]/).pop() || clause;
+  return segment
+    .replace(/改为$/, "")
+    .replace(/[：:，,、\s]+$/g, "")
+    .trim() || "条件效果";
 }
 
 function parseStats(text) {
