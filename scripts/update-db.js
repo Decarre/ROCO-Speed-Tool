@@ -28,6 +28,7 @@ const args = new Set(process.argv.slice(2));
 const shouldDownloadImages = !args.has("--no-images");
 const shouldUpdateSpirits = !args.has("--skills-only");
 const shouldUpdateSkills = !args.has("--spirits-only");
+const PROGRESS_PREFIX = "__ROCO_PROGRESS__";
 
 main().catch((error) => {
   console.error(`更新失败：${error.stack || error.message}`);
@@ -45,6 +46,21 @@ async function main() {
   if (shouldUpdateSkills) {
     await updateSkills();
   }
+
+  emitProgress({
+    phase: "complete",
+    label: "数据库更新完成",
+    current: 1,
+    total: 1,
+    detail: "全部完成"
+  });
+}
+
+function emitProgress(progress) {
+  console.log(`${PROGRESS_PREFIX}${JSON.stringify({
+    ...progress,
+    time: Date.now()
+  })}`);
 }
 
 async function updateSpirits() {
@@ -57,6 +73,14 @@ async function updateSpirits() {
   }
 
   console.log(`图鉴首页解析到 ${indexEntries.length} 个条目，开始抓取详情...`);
+  let completed = 0;
+  emitProgress({
+    phase: "spirits",
+    label: "抓取精灵资料",
+    current: completed,
+    total: indexEntries.length,
+    detail: "开始抓取精灵详情"
+  });
   const spirits = [];
   await mapLimit(indexEntries, MAX_CONCURRENCY, async (entry, index) => {
     await sleep((index % MAX_CONCURRENCY) * REQUEST_DELAY_MS);
@@ -70,6 +94,15 @@ async function updateSpirits() {
       }
     } catch (error) {
       console.warn(`跳过：${entry.displayName} ${error.message}`);
+    } finally {
+      completed += 1;
+      emitProgress({
+        phase: "spirits",
+        label: "抓取精灵资料",
+        current: completed,
+        total: indexEntries.length,
+        detail: entry.displayName
+      });
     }
   });
 
@@ -99,6 +132,13 @@ async function updateSpirits() {
 
   console.log(`完成：已生成 ${JSON_PATH}`);
   console.log(`完成：已生成 ${JS_PATH}`);
+  emitProgress({
+    phase: "spirits",
+    label: "精灵资料已保存",
+    current: indexEntries.length,
+    total: indexEntries.length,
+    detail: "精灵数据库写入完成"
+  });
 }
 
 async function updateSkills() {
@@ -107,6 +147,14 @@ async function updateSkills() {
   const skillEntries = parseSkillIndex(skillIndexHtml);
   console.log(`技能图鉴首页解析到 ${skillEntries.length} 个候选技能，开始筛选速度技能...`);
 
+  let completed = 0;
+  emitProgress({
+    phase: "skills",
+    label: "筛选加速技能",
+    current: completed,
+    total: skillEntries.length,
+    detail: "开始读取技能详情"
+  });
   const skills = [];
   await mapLimit(skillEntries, MAX_CONCURRENCY, async (entry, index) => {
     await sleep((index % MAX_CONCURRENCY) * REQUEST_DELAY_MS);
@@ -118,6 +166,15 @@ async function updateSkills() {
       }
     } catch (error) {
       console.warn(`跳过技能：${entry.name} ${error.message}`);
+    } finally {
+      completed += 1;
+      emitProgress({
+        phase: "skills",
+        label: "筛选加速技能",
+        current: completed,
+        total: skillEntries.length,
+        detail: entry.name
+      });
     }
   });
 
@@ -139,6 +196,13 @@ async function updateSkills() {
 
   console.log(`完成：已生成 ${SKILLS_JSON_PATH}`);
   console.log(`完成：已生成 ${SKILLS_JS_PATH}`);
+  emitProgress({
+    phase: "skills",
+    label: "加速技能已保存",
+    current: skillEntries.length,
+    total: skillEntries.length,
+    detail: "技能数据库写入完成"
+  });
   await attachSpeedSkillsToSpirits(skillDatabase);
 }
 

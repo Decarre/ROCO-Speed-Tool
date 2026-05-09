@@ -6,6 +6,7 @@ const fs = require("fs/promises");
 const { spawn } = require("child_process");
 
 let mainWindow;
+const PROGRESS_PREFIX = "__ROCO_PROGRESS__";
 
 function appDataDir() {
   return path.join(app.getPath("userData"), "data");
@@ -82,13 +83,35 @@ ipcMain.handle("roco:update-db", async (_event, options = {}) => {
     });
 
     let output = "";
+    let stdoutBuffer = "";
+    let stderrBuffer = "";
+    const handleOutput = (text, stream) => {
+      output += text;
+      const nextBuffer = `${stream === "stderr" ? stderrBuffer : stdoutBuffer}${text}`;
+      const lines = nextBuffer.split(/\r?\n/);
+      if (stream === "stderr") {
+        stderrBuffer = lines.pop() || "";
+      } else {
+        stdoutBuffer = lines.pop() || "";
+      }
+
+      lines.forEach((line) => {
+        if (line.startsWith(PROGRESS_PREFIX)) {
+          try {
+            mainWindow?.webContents.send("roco:update-progress", JSON.parse(line.slice(PROGRESS_PREFIX.length)));
+          } catch {
+            mainWindow?.webContents.send("roco:update-log", line);
+          }
+        } else if (line.trim()) {
+          mainWindow?.webContents.send("roco:update-log", `${line}\n`);
+        }
+      });
+    };
     child.stdout.on("data", (chunk) => {
-      output += chunk.toString("utf8");
-      mainWindow?.webContents.send("roco:update-log", chunk.toString("utf8"));
+      handleOutput(chunk.toString("utf8"), "stdout");
     });
     child.stderr.on("data", (chunk) => {
-      output += chunk.toString("utf8");
-      mainWindow?.webContents.send("roco:update-log", chunk.toString("utf8"));
+      handleOutput(chunk.toString("utf8"), "stderr");
     });
     child.on("error", reject);
     child.on("close", (code) => {

@@ -37,6 +37,18 @@
       padding: 28px 0;
     }
 
+    .watermark {
+      position: fixed;
+      top: 10px;
+      left: 12px;
+      z-index: 50;
+      color: rgba(29, 38, 51, 0.46);
+      font-size: 12px;
+      font-weight: 700;
+      pointer-events: none;
+      user-select: none;
+    }
+
     header {
       display: flex;
       align-items: end;
@@ -358,6 +370,40 @@
       line-height: 1.5;
     }
 
+    .desktop-progress {
+      display: grid;
+      gap: 8px;
+      margin: 0 0 16px;
+      padding: 12px 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.86);
+      box-shadow: var(--shadow);
+    }
+
+    .desktop-progress[hidden] {
+      display: none;
+    }
+
+    .desktop-progress-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .desktop-progress-head strong {
+      color: var(--ink);
+    }
+
+    progress {
+      width: 100%;
+      height: 12px;
+      accent-color: var(--accent);
+    }
+
     .tabs {
       display: flex;
       gap: 8px;
@@ -633,6 +679,7 @@
   </style>
 </head>
 <body>
+  <div class="watermark">by燒烤伴侶</div>
   <main>
     <header>
       <div>
@@ -646,6 +693,14 @@
         <button id="resetButton" class="danger-button">恢复示例库</button>
       </div>
     </header>
+
+    <div class="desktop-progress" id="desktopProgress" hidden>
+      <div class="desktop-progress-head">
+        <strong id="desktopProgressLabel">准备更新数据库</strong>
+        <span id="desktopProgressMeta">0%</span>
+      </div>
+      <progress id="desktopProgressBar" max="100" value="0"></progress>
+    </div>
 
     <section class="app-grid">
       <aside class="panel">
@@ -899,6 +954,10 @@
       libraryCount: document.querySelector("#libraryCount"),
       desktopUpdateButton: document.querySelector("#desktopUpdateButton"),
       desktopDataDirButton: document.querySelector("#desktopDataDirButton"),
+      desktopProgress: document.querySelector("#desktopProgress"),
+      desktopProgressLabel: document.querySelector("#desktopProgressLabel"),
+      desktopProgressMeta: document.querySelector("#desktopProgressMeta"),
+      desktopProgressBar: document.querySelector("#desktopProgressBar"),
       searchInput: document.querySelector("#searchInput"),
       spiritList: document.querySelector("#spiritList"),
       spiritName: document.querySelector("#spiritName"),
@@ -943,6 +1002,8 @@
     };
     let editingHistoryIndex = -1;
     let contextHistoryIndex = -1;
+    let updatePhase = "";
+    let updatePhaseStartedAt = 0;
 
     function round(value) {
       return Math.round(value);
@@ -1719,17 +1780,36 @@
 
       el.desktopUpdateButton.hidden = false;
       el.desktopDataDirButton.hidden = false;
+      window.ROCO_DESKTOP.onUpdateProgress?.(renderDesktopProgress);
       el.desktopUpdateButton.addEventListener("click", async () => {
         el.desktopUpdateButton.disabled = true;
+        updatePhase = "";
+        updatePhaseStartedAt = Date.now();
+        renderDesktopProgress({
+          phase: "prepare",
+          label: "准备更新数据库",
+          current: 0,
+          total: 1,
+          detail: "正在连接 BWiki"
+        });
         el.calcMessage.textContent = "正在更新数据库，首次运行会比较久，请稍等...";
         try {
           const database = await window.ROCO_DESKTOP.updateDatabase({ noImages: true });
           window.ROCO_SPIRITS_DB = database.spirits;
           window.ROCO_SKILLS_DB = database.skills;
           reloadLibraryFromBundledDatabase();
+          renderDesktopProgress({
+            phase: "complete",
+            label: "数据库更新完成",
+            current: 1,
+            total: 1,
+            detail: "全部完成"
+          });
           el.calcMessage.textContent = "数据库已更新完成。";
         } catch (error) {
           console.error(error);
+          el.desktopProgressLabel.textContent = "数据库更新失败";
+          el.desktopProgressMeta.textContent = "请稍后重试";
           el.calcMessage.textContent = error.message || "数据库更新失败。";
         } finally {
           el.desktopUpdateButton.disabled = false;
@@ -1739,6 +1819,45 @@
       el.desktopDataDirButton.addEventListener("click", () => {
         window.ROCO_DESKTOP.openDataDir();
       });
+    }
+
+    function renderDesktopProgress(progress) {
+      if (!progress) return;
+      const total = Math.max(1, Number(progress.total) || 1);
+      const current = Math.min(total, Math.max(0, Number(progress.current) || 0));
+      const percent = progress.phase === "complete" ? 100 : Math.round((current / total) * 100);
+
+      if (progress.phase !== updatePhase) {
+        updatePhase = progress.phase;
+        updatePhaseStartedAt = Date.now();
+      }
+
+      let etaText = "估算中";
+      if (progress.phase === "complete") {
+        etaText = "已完成";
+      } else if (current > 0) {
+        const elapsed = Date.now() - updatePhaseStartedAt;
+        const remaining = Math.max(0, Math.round((elapsed / current) * (total - current)));
+        etaText = `约剩 ${formatDuration(remaining)}`;
+      }
+
+      el.desktopProgress.hidden = false;
+      el.desktopProgressBar.value = percent;
+      el.desktopProgressLabel.textContent = progress.detail
+        ? `${progress.label}：${progress.detail}`
+        : progress.label;
+      el.desktopProgressMeta.textContent = `${current}/${total} · ${percent}% · ${etaText}`;
+    }
+
+    function formatDuration(ms) {
+      const seconds = Math.max(0, Math.round(ms / 1000));
+      if (seconds < 60) return `${seconds} 秒`;
+      const minutes = Math.floor(seconds / 60);
+      const rest = seconds % 60;
+      if (minutes < 60) return rest ? `${minutes} 分 ${rest} 秒` : `${minutes} 分`;
+      const hours = Math.floor(minutes / 60);
+      const minuteRest = minutes % 60;
+      return minuteRest ? `${hours} 小时 ${minuteRest} 分` : `${hours} 小时`;
     }
 
     initDesktopControls();

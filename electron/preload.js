@@ -38,5 +38,8 @@ window.ROCO_DESKTOP = {
   },
   onUpdateLog(callback) {
     ipcRenderer.on("roco:update-log", (_event, text) => callback(text));
+  },
+  onUpdateProgress(callback) {
+    ipcRenderer.on("roco:update-progress", (_event, progress) => callback(progress));
   }
 };
