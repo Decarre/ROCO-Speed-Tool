@@ -210,6 +210,7 @@ async function scrapeDetail(entry) {
   const html = await fetchText(entry.url);
   const text = htmlToText(html);
   const stats = parseStats(text);
+  const speedTraits = parseSpeedTraits(html, text);
   const portraitUrl = findPortraitUrl(html, entry.name) || entry.portraitUrl || "";
   const localImage = shouldDownloadImages && portraitUrl
     ? await downloadPortrait(portraitUrl, entry)
@@ -224,6 +225,7 @@ async function scrapeDetail(entry) {
     baseSpeed: stats.speed,
     stats,
     skillNames: parseSpiritSkillNames(html),
+    speedTraits,
     portraitUrl,
     localImage,
     pageUrl: entry.url
@@ -431,6 +433,78 @@ function parseSpiritSkillNames(html) {
   }
 
   return Array.from(names);
+}
+
+function parseSpeedTraits(html, text) {
+  const section = parseTraitSection(html, text);
+  if (!section) return [];
+
+  const variants = parseSpeedTraitVariants(section);
+  if (!variants.length) return [];
+
+  return [{
+    name: "速度特性",
+    effect: section,
+    variants
+  }];
+}
+
+function parseTraitSection(html, text) {
+  const decoded = decodeURIComponentSafe(decodeHtml(html));
+  const plainText = text || htmlToText(decoded);
+  const normalized = plainText.replace(/\n+/g, "\n");
+  const startMatch = normalized.match(/精灵特性|特性/);
+  if (!startMatch) return "";
+
+  const start = startMatch.index || 0;
+  const nearby = normalized.slice(start, start + 1800);
+  return nearby
+    .split(/\n(?:精灵技能|血脉技能|可学技能石|技能石|种族值|取自|分类)/)[0]
+    .replace(/\n+/g, " ")
+    .trim();
+}
+
+function parseSpeedTraitVariants(effect) {
+  const variants = parseSpeedBoostVariants(effect).map((variant) => ({
+    label: variant.label,
+    flatBonus: variant.speedBonus,
+    multiplier: 1
+  }));
+
+  const flatPatterns = [
+    { regex: /速度\s*-\s*(\d+)/g, sign: -1 },
+    { regex: /(?:减少|降低)\s*(\d+)\s*速度值?/g, sign: -1 }
+  ];
+  for (const pattern of flatPatterns) {
+    let match;
+    while ((match = pattern.regex.exec(effect))) {
+      const flatBonus = Number(match[1]) * pattern.sign;
+      if (!Number.isFinite(flatBonus) || flatBonus === 0) continue;
+      const label = variants.length === 0 ? "默认" : labelBefore(effect, match.index);
+      if (!variants.some((item) => item.flatBonus === flatBonus && item.multiplier === 1 && item.label === label)) {
+        variants.push({ label, flatBonus, multiplier: 1 });
+      }
+    }
+  }
+
+  const multiplierPatterns = [
+    { regex: /速度(?:提升|提高|增加|上升)\s*(\d+(?:\.\d+)?)%/g, toMultiplier: (value) => 1 + value / 100 },
+    { regex: /速度(?:降低|减少|下降)\s*(\d+(?:\.\d+)?)%/g, toMultiplier: (value) => Math.max(0, 1 - value / 100) },
+    { regex: /速度(?:变为|变成|提升至|提高至)?\s*(\d+(?:\.\d+)?)\s*倍/g, toMultiplier: (value) => value }
+  ];
+  for (const pattern of multiplierPatterns) {
+    let match;
+    while ((match = pattern.regex.exec(effect))) {
+      const multiplier = Math.round(pattern.toMultiplier(Number(match[1])) * 1000) / 1000;
+      if (!Number.isFinite(multiplier) || multiplier < 0 || multiplier === 1) continue;
+      const label = variants.length === 0 ? "默认" : labelBefore(effect, match.index);
+      if (!variants.some((item) => item.flatBonus === 0 && item.multiplier === multiplier && item.label === label)) {
+        variants.push({ label, flatBonus: 0, multiplier });
+      }
+    }
+  }
+
+  return variants;
 }
 
 function cleanSkillName(value) {

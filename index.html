@@ -778,6 +778,30 @@
               </div>
             </div>
 
+            <div class="row" style="margin: 14px 0;">
+              <div>
+                <label for="traitSelect">速度特性</label>
+                <select id="traitSelect">
+                  <option value="0">不使用特性</option>
+                  <option value="manual">手动输入特性</option>
+                </select>
+                <p class="hint" id="traitHint">可选择资料库识别到的速度特性，也可以手动填写固定值和倍率。</p>
+              </div>
+              <div>
+                <label for="traitFlatBonus">特性固定速度</label>
+                <input id="traitFlatBonus" type="number" step="1" value="0">
+              </div>
+            </div>
+
+            <div class="row" style="margin: 14px 0;">
+              <div>
+                <label for="traitMultiplier">特性速度倍率</label>
+                <input id="traitMultiplier" type="number" min="0" step="0.01" value="1">
+                <p class="hint">例如 1.2 表示最终速度提高 20%。</p>
+              </div>
+              <div></div>
+            </div>
+
             <div class="stats">
               <div class="stat" data-nature="slow">
                 <span>减速性格 0.9</span>
@@ -850,6 +874,10 @@
                   <th>技能加速</th>
                   <td id="skillPart">-</td>
                 </tr>
+                <tr>
+                  <th>特性修正</th>
+                  <td id="traitPart">-</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -917,6 +945,20 @@
         <label for="editHistorySkillName">技能名称</label>
         <input id="editHistorySkillName" placeholder="无技能可留空">
       </div>
+      <div>
+        <label for="editHistoryTraitName">特性名称</label>
+        <input id="editHistoryTraitName" placeholder="无特性可留空">
+      </div>
+      <div class="row">
+        <div>
+          <label for="editHistoryTraitFlatBonus">特性固定速度</label>
+          <input id="editHistoryTraitFlatBonus" type="number" step="1">
+        </div>
+        <div>
+          <label for="editHistoryTraitMultiplier">特性速度倍率</label>
+          <input id="editHistoryTraitMultiplier" type="number" min="0" step="0.01">
+        </div>
+      </div>
       <div class="actions">
         <button class="primary-button" id="saveHistoryEditButton">保存记录</button>
         <button id="cancelHistoryEditButton">取消</button>
@@ -967,6 +1009,10 @@
       skillSelect: document.querySelector("#skillSelect"),
       skillUses: document.querySelector("#skillUses"),
       skillHint: document.querySelector("#skillHint"),
+      traitSelect: document.querySelector("#traitSelect"),
+      traitFlatBonus: document.querySelector("#traitFlatBonus"),
+      traitMultiplier: document.querySelector("#traitMultiplier"),
+      traitHint: document.querySelector("#traitHint"),
       selectedSpiritLabel: document.querySelector("#selectedSpiritLabel"),
       spiritPortrait: document.querySelector("#spiritPortrait"),
       sourceLabel: document.querySelector("#sourceLabel"),
@@ -979,6 +1025,7 @@
       ivPart: document.querySelector("#ivPart"),
       subtotalPart: document.querySelector("#subtotalPart"),
       skillPart: document.querySelector("#skillPart"),
+      traitPart: document.querySelector("#traitPart"),
       libraryMessage: document.querySelector("#libraryMessage"),
       calcMessage: document.querySelector("#calcMessage"),
       importMessage: document.querySelector("#importMessage"),
@@ -997,6 +1044,9 @@
       editHistorySkillBonus: document.querySelector("#editHistorySkillBonus"),
       editHistorySkillUses: document.querySelector("#editHistorySkillUses"),
       editHistorySkillName: document.querySelector("#editHistorySkillName"),
+      editHistoryTraitName: document.querySelector("#editHistoryTraitName"),
+      editHistoryTraitFlatBonus: document.querySelector("#editHistoryTraitFlatBonus"),
+      editHistoryTraitMultiplier: document.querySelector("#editHistoryTraitMultiplier"),
       historyEditMessage: document.querySelector("#historyEditMessage"),
       importText: document.querySelector("#importText")
     };
@@ -1058,7 +1108,8 @@
             no: spirit.no || source?.no || "",
             noNumber: spirit.noNumber || source?.noNumber || null,
             stats: spirit.stats || source?.stats || null,
-          speedSkills: spirit.speedSkills?.length ? spirit.speedSkills : (source?.speedSkills || [])
+          speedSkills: spirit.speedSkills?.length ? spirit.speedSkills : (source?.speedSkills || []),
+          speedTraits: spirit.speedTraits?.length ? spirit.speedTraits : (source?.speedTraits || [])
         });
       });
       return sortSpirits(Array.from(map.values()));
@@ -1084,7 +1135,8 @@
             no: item.no || "",
             noNumber: item.noNumber || null,
             stats: item.stats || null,
-            speedSkills: Array.isArray(item.speedSkills) ? item.speedSkills : []
+            speedSkills: Array.isArray(item.speedSkills) ? item.speedSkills : [],
+            speedTraits: Array.isArray(item.speedTraits) ? item.speedTraits : []
           });
         }
       });
@@ -1167,6 +1219,7 @@
       const individualValue = Number(el.individualValue.value);
       const spirit = selectedSpirit();
       renderSkillOptions();
+      renderTraitOptions();
 
       el.selectedSpiritLabel.textContent = spirit ? `${spirit.name} · ${baseSpeed}速` : "手动输入";
       if (spirit?.image) {
@@ -1197,21 +1250,24 @@
       const selectedSkill = parseSelectedSkill();
       const uses = skillUseCount();
       const skillTotal = selectedSkill.speedBonus * uses;
-      const boosted = detail.speed + skillTotal;
+      const trait = currentTraitAdjustment();
+      const beforeTrait = detail.speed + skillTotal;
+      const boosted = applyTraitAdjustment(beforeTrait, trait);
 
       el.slowSpeed.textContent = slow.speed;
       el.neutralSpeed.textContent = neutral.speed;
       el.fastSpeed.textContent = fast.speed;
-      el.boostedLabel.textContent = selectedSkill.speedBonus > 0
-        ? `${natureLabel(el.natureSelect.value)} + ${selectedSkill.name} × ${uses}`
-        : `${natureLabel(el.natureSelect.value)}，无技能`;
+      el.boostedLabel.textContent = boostedLabel(selectedSkill, uses, trait);
       el.boostedSpeed.textContent = boosted;
       el.basePart.textContent = `round(${baseSpeed} × 1.1) = ${detail.basePart}`;
       el.ivPart.textContent = `round(${individualValue} × 0.55) = ${detail.ivPart}`;
       el.subtotalPart.textContent = `${detail.basePart} + ${detail.ivPart} + 10 = ${detail.subtotal}`;
       el.skillPart.textContent = selectedSkill.speedBonus > 0
-        ? `${detail.speed} + ${selectedSkill.speedBonus} × ${uses} = ${boosted}（${selectedSkill.name}：${selectedSkill.label}）`
-        : `${detail.speed} + 0 = ${boosted}`;
+        ? `${detail.speed} + ${selectedSkill.speedBonus} × ${uses} = ${beforeTrait}（${selectedSkill.name}：${selectedSkill.label}）`
+        : `${detail.speed} + 0 = ${beforeTrait}`;
+      el.traitPart.textContent = traitIsActive(trait)
+        ? `round((${beforeTrait} + ${trait.flatBonus}) × ${trait.multiplier}) = ${boosted}（${trait.name || "手动特性"}）`
+        : `${beforeTrait} × 1 = ${boosted}`;
     }
 
     function renderHistory() {
@@ -1228,9 +1284,10 @@
         const natureText = natureLabel(item.nature);
         const uses = historySkillUses(item);
         const skillText = item.skillName ? ` · ${item.skillName}×${uses}` : "";
+        const traitText = traitIsActive(historyTrait(item)) ? ` · ${historyTraitLabel(item)}` : "";
         row.innerHTML = `
           <div>
-            <div class="history-title">${escapeHtml(item.name)} · ${natureText}${skillText} · ${item.result}速</div>
+            <div class="history-title">${escapeHtml(item.name)} · ${natureText}${skillText}${traitText} · ${item.result}速</div>
             <div class="badge">B${item.baseSpeed} / IV${item.individualValue}</div>
           </div>
           <div class="history-actions">
@@ -1254,6 +1311,9 @@
       el.natureSelect.value = item.nature;
       el.skillSelect.value = item.skillValue || "0";
       el.skillUses.value = item.skillName ? historySkillUses(item) : 1;
+      el.traitSelect.value = item.traitValue || (traitIsActive(historyTrait(item)) ? "manual" : "0");
+      el.traitFlatBonus.value = historyTrait(item).flatBonus;
+      el.traitMultiplier.value = historyTrait(item).multiplier;
       renderAll();
     }
 
@@ -1268,6 +1328,9 @@
       el.editHistorySkillBonus.value = item.skillBonus || 0;
       el.editHistorySkillUses.value = historySkillUses(item);
       el.editHistorySkillName.value = item.skillName || "";
+      el.editHistoryTraitName.value = item.traitName || "";
+      el.editHistoryTraitFlatBonus.value = historyTrait(item).flatBonus;
+      el.editHistoryTraitMultiplier.value = historyTrait(item).multiplier;
       el.historyEditMessage.textContent = "";
       el.historyDialog.showModal();
     }
@@ -1283,8 +1346,11 @@
       const skillBonus = Number(el.editHistorySkillBonus.value) || 0;
       const skillUses = Number(el.editHistorySkillUses.value);
       const skillName = el.editHistorySkillName.value.trim();
+      const traitName = el.editHistoryTraitName.value.trim();
+      const traitFlatBonus = Number(el.editHistoryTraitFlatBonus.value) || 0;
+      const traitMultiplier = Number(el.editHistoryTraitMultiplier.value || 1);
 
-      if (!name || !Number.isFinite(baseSpeed) || !Number.isFinite(individualValue) || !Number.isFinite(skillUses) || baseSpeed < 0 || individualValue < 0 || skillBonus < 0 || skillUses < 0) {
+      if (!name || !Number.isFinite(baseSpeed) || !Number.isFinite(individualValue) || !Number.isFinite(skillUses) || !Number.isFinite(traitFlatBonus) || !Number.isFinite(traitMultiplier) || baseSpeed < 0 || individualValue < 0 || skillBonus < 0 || skillUses < 0 || traitMultiplier < 0) {
         el.historyEditMessage.textContent = "请填写有效的记录数据。";
         return;
       }
@@ -1292,6 +1358,11 @@
       const baseResult = calculate(baseSpeed, individualValue, natureModifier(nature)).speed;
       const roundedSkillBonus = round(skillBonus);
       const roundedSkillUses = round(skillUses);
+      const trait = {
+        name: traitName,
+        flatBonus: round(traitFlatBonus),
+        multiplier: normalizeMultiplier(traitMultiplier)
+      };
       state.history[editingHistoryIndex] = {
         ...item,
         name,
@@ -1302,7 +1373,11 @@
         skillBonus: roundedSkillBonus,
         skillUses: roundedSkillUses,
         skillValue: skillName ? `${skillName}|手动编辑|${roundedSkillBonus}` : "0",
-        result: baseResult + roundedSkillBonus * roundedSkillUses,
+        traitName: traitIsActive(trait) ? (traitName || trait.name) : "",
+        traitFlatBonus: trait.flatBonus,
+        traitMultiplier: trait.multiplier,
+        traitValue: traitIsActive(trait) ? "manual" : "0",
+        result: applyTraitAdjustment(baseResult + roundedSkillBonus * roundedSkillUses, trait),
         editedAt: new Date().toISOString()
       };
       saveState();
@@ -1394,7 +1469,8 @@
       const selectedSkill = parseSelectedSkill();
       const baseResult = calculate(baseSpeed, individualValue, natureModifier(nature)).speed;
       const uses = skillUseCount();
-      const result = baseResult + selectedSkill.speedBonus * uses;
+      const trait = currentTraitAdjustment();
+      const result = applyTraitAdjustment(baseResult + selectedSkill.speedBonus * uses, trait);
 
       state.history.unshift({
         name,
@@ -1405,6 +1481,10 @@
         skillName: selectedSkill.speedBonus > 0 ? selectedSkill.name : "",
         skillBonus: selectedSkill.speedBonus,
         skillUses: selectedSkill.speedBonus > 0 ? uses : 0,
+        traitValue: el.traitSelect.value,
+        traitName: traitIsActive(trait) ? trait.name : "",
+        traitFlatBonus: trait.flatBonus,
+        traitMultiplier: trait.multiplier,
         result,
         time: new Date().toISOString()
       });
@@ -1455,6 +1535,8 @@
         const hasFullIv = Number(item.individualValue) >= 60;
         const uses = historySkillUses(item);
         const skillText = item.skillName ? `<br>技能：${escapeHtml(item.skillName)} +${item.skillBonus || 0} × ${uses}` : "";
+        const trait = historyTrait(item);
+        const traitText = traitIsActive(trait) ? `<br>特性：${escapeHtml(historyTraitLabel(item))}` : "";
         marker.innerHTML = `
           ${spirit?.image ? `<img src="${escapeHtml(spirit.image)}" alt="${escapeHtml(item.name)}">` : `<span>${escapeHtml(item.name.slice(0, 1))}</span>`}
           <div class="tooltip">
@@ -1462,7 +1544,7 @@
             速度种族值：${item.baseSpeed}<br>
             当前速度：${item.result}<br>
             性格：${natureLabel(item.nature)}${isFast ? "（加速）" : ""}<br>
-            个体值：${item.individualValue}${hasFullIv ? "（满个体）" : ""}${skillText}
+            个体值：${item.individualValue}${hasFullIv ? "（满个体）" : ""}${skillText}${traitText}
           </div>
         `;
         marker.addEventListener("contextmenu", (event) => {
@@ -1626,12 +1708,14 @@
       const fast = calculate(baseSpeed, individualValue, 1.2).speed;
       const selectedSkill = parseSelectedSkill();
       const uses = skillUseCount();
+      const trait = currentTraitAdjustment();
       const selectedNatureSpeed = calculate(baseSpeed, individualValue, natureModifier(el.natureSelect.value)).speed;
-      const boosted = selectedNatureSpeed + selectedSkill.speedBonus * uses;
+      const boosted = applyTraitAdjustment(selectedNatureSpeed + selectedSkill.speedBonus * uses, trait);
       const skillText = selectedSkill.speedBonus > 0
         ? `；${natureLabel(el.natureSelect.value)}使用${selectedSkill.name}×${uses}后${boosted}`
         : "";
-      const text = `${name}：基础速度${baseSpeed}，个体值${individualValue}；减速${slow}，默认${neutral}，加速${fast}${skillText}`;
+      const traitText = traitIsActive(trait) ? `；特性${trait.name || "手动"}后${boosted}` : "";
+      const text = `${name}：基础速度${baseSpeed}，个体值${individualValue}；减速${slow}，默认${neutral}，加速${fast}${skillText}${traitText}`;
 
       navigator.clipboard?.writeText(text).then(() => {
         el.calcMessage.textContent = "结果已复制。";
@@ -1692,6 +1776,38 @@
         : "尚未载入技能数据库，运行“更新数据库.bat”后会自动抓取技能。";
     }
 
+    function renderTraitOptions() {
+      const previousValue = el.traitSelect.value;
+      const spirit = selectedSpirit();
+      const availableTraits = spirit ? (spirit.speedTraits || []) : [];
+
+      el.traitSelect.innerHTML = `
+        <option value="0">不使用特性</option>
+        <option value="manual">手动输入特性</option>
+      `;
+      availableTraits.forEach((trait) => {
+        (trait.variants || []).forEach((variant, index) => {
+          const option = document.createElement("option");
+          const flatBonus = Number(variant.flatBonus) || 0;
+          const multiplier = normalizeMultiplier(variant.multiplier ?? 1);
+          option.value = `${trait.name}|${variant.label || "默认"}|${flatBonus}|${multiplier}`;
+          option.textContent = `${trait.name}${index ? ` / ${variant.label}` : ""}：${traitVariantText({ flatBonus, multiplier })}`;
+          option.dataset.effect = trait.effect || "";
+          el.traitSelect.appendChild(option);
+        });
+      });
+
+      if ([...el.traitSelect.options].some((option) => option.value === previousValue)) {
+        el.traitSelect.value = previousValue;
+      } else if (previousValue === "manual") {
+        el.traitSelect.value = "manual";
+      }
+
+      el.traitHint.textContent = availableTraits.length
+        ? `当前精灵识别到 ${availableTraits.length} 个速度相关特性；条件类特性请按实际触发情况选择或手动填写。`
+        : "当前精灵未识别到速度特性，可手动填写固定速度或倍率。";
+    }
+
     function parseSelectedSkill() {
       if (!el.skillSelect.value || el.skillSelect.value === "0") {
         return { name: "无技能", label: "无", speedBonus: 0 };
@@ -1702,6 +1818,72 @@
         label,
         speedBonus: Number(bonus) || 0
       };
+    }
+
+    function parseSelectedTrait() {
+      if (!el.traitSelect.value || el.traitSelect.value === "0" || el.traitSelect.value === "manual") {
+        return { name: "", label: "手动", flatBonus: 0, multiplier: 1 };
+      }
+      const [name, label, flatBonus, multiplier] = el.traitSelect.value.split("|");
+      return {
+        name,
+        label,
+        flatBonus: Number(flatBonus) || 0,
+        multiplier: normalizeMultiplier(multiplier)
+      };
+    }
+
+    function applySelectedTraitToInputs() {
+      const trait = parseSelectedTrait();
+      if (el.traitSelect.value === "manual") return;
+      el.traitFlatBonus.value = trait.flatBonus;
+      el.traitMultiplier.value = trait.multiplier;
+      renderCalculator();
+    }
+
+    function currentTraitAdjustment() {
+      const selected = parseSelectedTrait();
+      const flatBonus = Number(el.traitFlatBonus.value) || 0;
+      const multiplier = normalizeMultiplier(el.traitMultiplier.value);
+      const manualName = el.traitSelect.value === "manual" && (flatBonus !== 0 || multiplier !== 1)
+        ? "手动特性"
+        : "";
+      return {
+        name: selected.name || manualName,
+        label: selected.label || "手动",
+        flatBonus: round(flatBonus),
+        multiplier
+      };
+    }
+
+    function applyTraitAdjustment(speed, trait) {
+      return round((speed + (Number(trait.flatBonus) || 0)) * normalizeMultiplier(trait.multiplier));
+    }
+
+    function traitIsActive(trait) {
+      return Boolean(trait?.name) || Number(trait?.flatBonus || 0) !== 0 || normalizeMultiplier(trait?.multiplier) !== 1;
+    }
+
+    function normalizeMultiplier(value) {
+      if (value === "" || value === null || value === undefined) return 1;
+      const multiplier = Number(value);
+      if (!Number.isFinite(multiplier) || multiplier < 0) return 1;
+      return Math.round(multiplier * 1000) / 1000;
+    }
+
+    function traitVariantText(trait) {
+      const parts = [];
+      if (Number(trait.flatBonus || 0) !== 0) parts.push(`${trait.flatBonus > 0 ? "+" : ""}${trait.flatBonus}`);
+      if (normalizeMultiplier(trait.multiplier) !== 1) parts.push(`×${normalizeMultiplier(trait.multiplier)}`);
+      return parts.length ? parts.join("，") : "无速度修正";
+    }
+
+    function boostedLabel(selectedSkill, uses, trait) {
+      const parts = [natureLabel(el.natureSelect.value)];
+      if (selectedSkill.speedBonus > 0) parts.push(`${selectedSkill.name} × ${uses}`);
+      if (traitIsActive(trait)) parts.push(trait.name || "特性修正");
+      if (parts.length === 1) return `${parts[0]}，无技能/特性`;
+      return parts.join(" + ");
     }
 
     function skillUseCount() {
@@ -1715,6 +1897,20 @@
       return item.skillUses ?? 1;
     }
 
+    function historyTrait(item) {
+      return {
+        name: item.traitName || "",
+        flatBonus: Number(item.traitFlatBonus) || 0,
+        multiplier: normalizeMultiplier(item.traitMultiplier ?? 1)
+      };
+    }
+
+    function historyTraitLabel(item) {
+      const trait = historyTrait(item);
+      const text = traitVariantText(trait);
+      return `${trait.name || "手动特性"} ${text}`;
+    }
+
     function getBundledSpirits() {
       if (window.ROCO_SPIRITS_DB?.spirits?.length) {
         return window.ROCO_SPIRITS_DB.spirits.map((spirit) => ({
@@ -1726,7 +1922,8 @@
           no: spirit.no || "",
           noNumber: spirit.noNumber || null,
           stats: spirit.stats || null,
-          speedSkills: Array.isArray(spirit.speedSkills) ? spirit.speedSkills : []
+          speedSkills: Array.isArray(spirit.speedSkills) ? spirit.speedSkills : [],
+          speedTraits: Array.isArray(spirit.speedTraits) ? spirit.speedTraits : []
         }));
       }
       return fallbackSpirits;
@@ -1904,6 +2101,7 @@
     });
     document.querySelector("#exportButton").addEventListener("click", exportData);
     document.querySelector("#resetButton").addEventListener("click", resetLibrary);
+    el.traitSelect.addEventListener("change", applySelectedTraitToInputs);
     el.referenceOffset.addEventListener("input", () => {
       referenceOffset = Number(el.referenceOffset.value) || 0;
       el.referenceOffsetValue.textContent = `${referenceOffset}px`;
@@ -1920,6 +2118,14 @@
       el.natureSelect.addEventListener(eventName, renderCalculator);
       el.skillSelect.addEventListener(eventName, renderCalculator);
       el.skillUses.addEventListener(eventName, renderCalculator);
+      el.traitFlatBonus.addEventListener(eventName, () => {
+        el.traitSelect.value = el.traitSelect.value === "0" ? "manual" : el.traitSelect.value;
+        renderCalculator();
+      });
+      el.traitMultiplier.addEventListener(eventName, () => {
+        el.traitSelect.value = el.traitSelect.value === "0" ? "manual" : el.traitSelect.value;
+        renderCalculator();
+      });
       el.spiritName.addEventListener(eventName, () => {
         selectedName = el.spiritName.value.trim();
         renderCalculator();
@@ -1932,6 +2138,7 @@
       el.baseSpeed.value = first.baseSpeed;
     }
     renderSkillOptions();
+    renderTraitOptions();
     renderAll();
   </script>
 </body>
