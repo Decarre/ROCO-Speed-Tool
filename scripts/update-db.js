@@ -349,7 +349,7 @@ function parseSkillEffect(text) {
 function parseSpeedBoostVariants(effect) {
   const variants = [];
   const patterns = [
-    { regex: /速度\s*\+\s*(\d+)/g, valueIndex: 1 },
+    { regex: /速度(?:永久|临时)?\s*\+\s*(\d+)/g, valueIndex: 1 },
     { regex: /\+\s*(\d+)\s*速度值?/g, valueIndex: 1 },
     { regex: /增加\s*(\d+)\s*速度值?/g, valueIndex: 1 },
     { regex: /获得\s*(\d+)\s*速度值?/g, valueIndex: 1 }
