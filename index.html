@@ -1100,6 +1100,7 @@
       sourceSpirits.forEach((spirit) => map.set(spirit.name, { ...spirit }));
       savedSpirits.forEach((spirit) => {
         const source = map.get(spirit.name);
+        const isDatabaseSpirit = Boolean(source);
         map.set(spirit.name, {
           ...(source || {}),
           ...spirit,
@@ -1108,8 +1109,8 @@
             no: spirit.no || source?.no || "",
             noNumber: spirit.noNumber || source?.noNumber || null,
             stats: spirit.stats || source?.stats || null,
-          speedSkills: spirit.speedSkills?.length ? spirit.speedSkills : (source?.speedSkills || []),
-          speedTraits: spirit.speedTraits?.length ? spirit.speedTraits : (source?.speedTraits || [])
+          speedSkills: isDatabaseSpirit ? (source.speedSkills || []) : (spirit.speedSkills || []),
+          speedTraits: isDatabaseSpirit ? (source.speedTraits || []) : (spirit.speedTraits || [])
         });
       });
       return sortSpirits(Array.from(map.values()));
