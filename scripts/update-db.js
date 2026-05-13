@@ -353,35 +353,45 @@ function parseSkillEffect(text) {
 }
 
 function parseSpeedBoostVariants(effect) {
-  return recognizeSpeedEffects(effect)
-    .filter((item) => item.speedBonus > 0)
+  return recognizeSpeedAdjustments(effect)
+    .filter((item) => item.flatBonus > 0 && item.multiplier === 1)
     .map((item, index) => ({
       label: index === 0 ? "默认" : item.label,
-      speedBonus: item.speedBonus,
+      speedBonus: item.flatBonus,
       confidence: item.confidence,
       evidence: item.evidence
     }));
 }
 
 function recognizeSpeedEffects(effect) {
+  return recognizeSpeedAdjustments(effect)
+    .filter((item) => item.flatBonus !== 0)
+    .map((item) => ({
+      ...item,
+      speedBonus: item.flatBonus
+    }));
+}
+
+function recognizeSpeedAdjustments(effect) {
   const text = normalizeEffectText(effect);
   if (!text) return [];
 
-  const variants = [];
+  const adjustments = [];
   const clauses = splitEffectClauses(text);
   for (const clause of clauses) {
-    const candidates = speedEffectCandidates(clause);
+    const candidates = speedAdjustmentCandidates(clause);
     for (const candidate of candidates) {
-      const duplicate = variants.some((item) =>
-        item.speedBonus === candidate.speedBonus &&
+      const duplicate = adjustments.some((item) =>
+        item.flatBonus === candidate.flatBonus &&
+        item.multiplier === candidate.multiplier &&
         item.label === candidate.label &&
         item.evidence === candidate.evidence
       );
-      if (!duplicate) variants.push(candidate);
+      if (!duplicate) adjustments.push(candidate);
     }
   }
 
-  return variants;
+  return adjustments;
 }
 
 function normalizeEffectText(effect) {
@@ -399,20 +409,20 @@ function splitEffectClauses(text) {
     .filter(Boolean);
 }
 
-function speedEffectCandidates(clause) {
+function speedAdjustmentCandidates(clause) {
   if (!clause.includes("速度")) return [];
-  const patterns = [
+  const flatPatterns = [
     { regex: /速度(?:值|能力|等级)?(?:永久|临时|持续)?\s*\+\s*(\d+)/g, sign: 1 },
-    { regex: /速度(?:值|能力|等级)?(?:永久|临时|持续)?(?:提升|提高|增加|上升|获得|强化)\s*(\d+)/g, sign: 1 },
-    { regex: /(?:提升|提高|增加|上升|获得|强化)\s*(?:自身|自己|我方|本精灵)?\s*(\d+)\s*(?:点|的)?速度(?:值|能力|等级)?/g, sign: 1 },
+    { regex: /速度(?:值|能力|等级)?(?:永久|临时|持续)?(?:提升|提高|增加|上升|获得|强化)\s*(\d+)(?![\d%％倍])/g, sign: 1 },
+    { regex: /(?:提升|提高|增加|上升|获得|强化)\s*(?:自身|自己|我方|本精灵)?\s*(\d+)(?![\d%％倍])\s*(?:点|的)?速度(?:值|能力|等级)?/g, sign: 1 },
     { regex: /\+\s*(\d+)\s*(?:点|的)?速度(?:值|能力|等级)?/g, sign: 1 },
-    { regex: /速度(?:值|能力|等级)?(?:降低|减少|下降|削弱)\s*(\d+)/g, sign: -1 },
-    { regex: /(?:降低|减少|下降|削弱)\s*(?:敌方|对方|目标|自身|自己|我方)?\s*(\d+)\s*(?:点|的)?速度(?:值|能力|等级)?/g, sign: -1 },
+    { regex: /速度(?:值|能力|等级)?(?:降低|减少|下降|削弱)\s*(\d+)(?![\d%％倍])/g, sign: -1 },
+    { regex: /(?:降低|减少|下降|削弱)\s*(?:敌方|对方|目标|自身|自己|我方)?\s*(\d+)(?![\d%％倍])\s*(?:点|的)?速度(?:值|能力|等级)?/g, sign: -1 },
     { regex: /速度(?:值|能力|等级)?\s*-\s*(\d+)/g, sign: -1 }
   ];
 
   const candidates = [];
-  for (const pattern of patterns) {
+  for (const pattern of flatPatterns) {
     let match;
     while ((match = pattern.regex.exec(clause))) {
       const amount = Number(match[1]) * pattern.sign;
@@ -422,7 +432,34 @@ function speedEffectCandidates(clause) {
 
       candidates.push({
         label: labelBefore(clause, match.index),
-        speedBonus: amount,
+        flatBonus: amount,
+        multiplier: 1,
+        type: "flat",
+        confidence,
+        evidence: match[0]
+      });
+    }
+  }
+
+  const multiplierPatterns = [
+    { regex: /速度(?:提升|提高|增加|上升)\s*(\d+(?:\.\d+)?)%/g, toMultiplier: (value) => 1 + value / 100 },
+    { regex: /速度(?:降低|减少|下降)\s*(\d+(?:\.\d+)?)%/g, toMultiplier: (value) => Math.max(0, 1 - value / 100) },
+    { regex: /速度(?:变为|变成|提升至|提高至)?\s*(\d+(?:\.\d+)?)\s*倍/g, toMultiplier: (value) => value }
+  ];
+
+  for (const pattern of multiplierPatterns) {
+    let match;
+    while ((match = pattern.regex.exec(clause))) {
+      const multiplier = Math.round(pattern.toMultiplier(Number(match[1])) * 1000) / 1000;
+      if (!Number.isFinite(multiplier) || multiplier < 0 || multiplier === 1) continue;
+      const confidence = speedEffectConfidence(clause, match[0], multiplier > 1 ? 1 : -1);
+      if (confidence < 60) continue;
+
+      candidates.push({
+        label: labelBefore(clause, match.index),
+        flatBonus: 0,
+        multiplier,
+        type: "multiplier",
         confidence,
         evidence: match[0]
       });
@@ -474,6 +511,23 @@ function runSpeedEffectRecognizerSelfTest() {
       expected: []
     }
   ];
+  const adjustmentCases = [
+    {
+      name: "速度百分比提升",
+      text: "入场后速度提升20%。",
+      expected: [{ flatBonus: 0, multiplier: 1.2 }]
+    },
+    {
+      name: "速度倍数变化",
+      text: "天气存在时速度变为1.5倍。",
+      expected: [{ flatBonus: 0, multiplier: 1.5 }]
+    },
+    {
+      name: "速度降低固定值",
+      text: "目标速度降低50。",
+      expected: [{ flatBonus: -50, multiplier: 1 }]
+    }
+  ];
 
   let failed = 0;
   for (const item of cases) {
@@ -482,6 +536,30 @@ function runSpeedEffectRecognizerSelfTest() {
     console.log(`${ok ? "✓" : "✗"} ${item.name}: ${JSON.stringify(actual)}`);
     if (!ok) failed += 1;
   }
+
+  for (const item of adjustmentCases) {
+    const actual = recognizeSpeedAdjustments(item.text).map((variant) => ({
+      flatBonus: variant.flatBonus,
+      multiplier: variant.multiplier
+    }));
+    const ok = JSON.stringify(actual) === JSON.stringify(item.expected);
+    console.log(`${ok ? "✓" : "✗"} ${item.name}: ${JSON.stringify(actual)}`);
+    if (!ok) failed += 1;
+  }
+
+  const blackCatTraits = parseSpeedTraits(`
+    <div class="rocom_sprite_info_characteristic_content">
+      <p><img alt="预警" title="预警" /></p>
+      <p class="rocom_sprite_info_characteristic_title font-mainfeiziti">预警</p>
+      <p class="rocom_sprite_info_characteristic_text font-fzltyjt">若敌方技能足够击败自己，回合开始时自己获得速度+50。</p>
+    </div>
+    <div class="rocom_sprite_temp_attribute_box">
+      <p>精灵属性</p>
+    </div>
+  `, "");
+  const blackCatOk = blackCatTraits[0]?.name === "预警" && blackCatTraits[0]?.variants?.[0]?.flatBonus === 50;
+  console.log(`${blackCatOk ? "✓" : "✗"} 黑猫巫师特性: ${JSON.stringify(blackCatTraits)}`);
+  if (!blackCatOk) failed += 1;
 
   if (failed) {
     throw new Error(`速度效果识别器自检失败：${failed} 项`);
@@ -553,6 +631,15 @@ function parseSpiritSkillNames(html) {
 }
 
 function parseSpeedTraits(html, text) {
+  const traits = parseTraitBlocks(html, text)
+    .map((trait) => ({
+      ...trait,
+      variants: parseSpeedTraitVariants(trait.effect)
+    }))
+    .filter((trait) => trait.variants.length);
+
+  if (traits.length) return traits;
+
   const section = parseTraitSection(html, text);
   if (!section) return [];
 
@@ -566,6 +653,30 @@ function parseSpeedTraits(html, text) {
   }];
 }
 
+function parseTraitBlocks(html, text) {
+  const decodedHtml = decodeURIComponentSafe(decodeHtml(html));
+  const blocks = [];
+  const blockRegex = /<div[^>]*class="[^"]*rocom_sprite_info_characteristic_content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>\s*<\/div>\s*<div class="rocom_sprite_temp_attribute_box"|<div class="rocom_sprite_info_characteristic_content"|<div class="rocom_sprite_temp_attribute_box")/g;
+  let match;
+
+  while ((match = blockRegex.exec(decodedHtml))) {
+    const block = match[1];
+    const titleMatch = block.match(/class="[^"]*rocom_sprite_info_characteristic_title[^"]*"[^>]*>([\s\S]*?)<\/p>/);
+    const effectMatch = block.match(/class="[^"]*rocom_sprite_info_characteristic_text[^"]*"[^>]*>([\s\S]*?)<\/p>/);
+    const imageTitleMatch = block.match(/(?:alt|title)="([^"]+)"/);
+    const name = cleanText(titleMatch?.[1] || imageTitleMatch?.[1] || "速度特性");
+    const effect = cleanText(effectMatch?.[1] || block);
+    if (effect) {
+      blocks.push({ name, effect });
+    }
+  }
+
+  if (blocks.length) return blocks;
+
+  const section = parseTraitSection(html, text);
+  return section ? [{ name: inferTraitName(section), effect: section }] : [];
+}
+
 function parseTraitSection(html, text) {
   const decoded = decodeURIComponentSafe(decodeHtml(html));
   const plainText = text || htmlToText(decoded);
@@ -576,52 +687,25 @@ function parseTraitSection(html, text) {
   const start = startMatch.index || 0;
   const nearby = normalized.slice(start, start + 1800);
   return nearby
-    .split(/\n(?:精灵技能|血脉技能|可学技能石|技能石|种族值|取自|分类)/)[0]
+    .split(/\n(?:精灵属性|精灵技能|血脉技能|可学技能石|技能石|种族值|取自|分类)/)[0]
     .replace(/\n+/g, " ")
     .trim();
 }
 
+function inferTraitName(section) {
+  const compact = String(section || "").replace(/\s+/g, "");
+  const match = compact.match(/特性([^：:。；;\s]{1,12})/);
+  return match ? match[1] : "速度特性";
+}
+
 function parseSpeedTraitVariants(effect) {
-  const variants = parseSpeedBoostVariants(effect).map((variant) => ({
-    label: variant.label,
-    flatBonus: variant.speedBonus,
-    multiplier: 1
+  return recognizeSpeedAdjustments(effect).map((adjustment, index) => ({
+    label: index === 0 ? "默认" : adjustment.label,
+    flatBonus: adjustment.flatBonus,
+    multiplier: adjustment.multiplier,
+    confidence: adjustment.confidence,
+    evidence: adjustment.evidence
   }));
-
-  const flatPatterns = [
-    { regex: /速度\s*-\s*(\d+)/g, sign: -1 },
-    { regex: /(?:减少|降低)\s*(\d+)\s*速度值?/g, sign: -1 }
-  ];
-  for (const pattern of flatPatterns) {
-    let match;
-    while ((match = pattern.regex.exec(effect))) {
-      const flatBonus = Number(match[1]) * pattern.sign;
-      if (!Number.isFinite(flatBonus) || flatBonus === 0) continue;
-      const label = variants.length === 0 ? "默认" : labelBefore(effect, match.index);
-      if (!variants.some((item) => item.flatBonus === flatBonus && item.multiplier === 1 && item.label === label)) {
-        variants.push({ label, flatBonus, multiplier: 1 });
-      }
-    }
-  }
-
-  const multiplierPatterns = [
-    { regex: /速度(?:提升|提高|增加|上升)\s*(\d+(?:\.\d+)?)%/g, toMultiplier: (value) => 1 + value / 100 },
-    { regex: /速度(?:降低|减少|下降)\s*(\d+(?:\.\d+)?)%/g, toMultiplier: (value) => Math.max(0, 1 - value / 100) },
-    { regex: /速度(?:变为|变成|提升至|提高至)?\s*(\d+(?:\.\d+)?)\s*倍/g, toMultiplier: (value) => value }
-  ];
-  for (const pattern of multiplierPatterns) {
-    let match;
-    while ((match = pattern.regex.exec(effect))) {
-      const multiplier = Math.round(pattern.toMultiplier(Number(match[1])) * 1000) / 1000;
-      if (!Number.isFinite(multiplier) || multiplier < 0 || multiplier === 1) continue;
-      const label = variants.length === 0 ? "默认" : labelBefore(effect, match.index);
-      if (!variants.some((item) => item.flatBonus === 0 && item.multiplier === multiplier && item.label === label)) {
-        variants.push({ label, flatBonus: 0, multiplier });
-      }
-    }
-  }
-
-  return variants;
 }
 
 function cleanSkillName(value) {
