@@ -1205,13 +1205,25 @@
         const noText = spirit.no ? `${escapeHtml(spirit.no)} · ` : "";
         button.innerHTML = `${imageHtml(spirit.image, spirit.name)}<span>${escapeHtml(spirit.name)}</span><span class="badge">${noText}速 ${spirit.baseSpeed}</span>`;
         button.addEventListener("click", () => {
+          const changedSpirit = selectedName !== spirit.name;
           selectedName = spirit.name;
           el.spiritName.value = spirit.name;
           el.baseSpeed.value = spirit.baseSpeed;
+          if (changedSpirit) {
+            resetTemporarySpeedAdjustments();
+          }
           renderAll();
         });
         el.spiritList.appendChild(button);
       });
+    }
+
+    function resetTemporarySpeedAdjustments() {
+      el.skillSelect.value = "0";
+      el.skillUses.value = 1;
+      el.traitSelect.value = "0";
+      el.traitFlatBonus.value = 0;
+      el.traitMultiplier.value = 1;
     }
 
     function renderCalculator() {
