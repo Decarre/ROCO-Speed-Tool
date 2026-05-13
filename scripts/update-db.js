@@ -29,6 +29,7 @@ const shouldDownloadImages = !args.has("--no-images");
 const shouldUpdateSpirits = !args.has("--skills-only");
 const shouldUpdateSkills = !args.has("--spirits-only");
 const PROGRESS_PREFIX = "__ROCO_PROGRESS__";
+const runRecognizerSelfTest = args.has("--recognizer-self-test");
 
 main().catch((error) => {
   console.error(`更新失败：${error.stack || error.message}`);
@@ -36,6 +37,11 @@ main().catch((error) => {
 });
 
 async function main() {
+  if (runRecognizerSelfTest) {
+    runSpeedEffectRecognizerSelfTest();
+    return;
+  }
+
   await fs.mkdir(DATA_DIR, { recursive: true });
   await fs.mkdir(IMAGE_DIR, { recursive: true });
 
@@ -347,28 +353,139 @@ function parseSkillEffect(text) {
 }
 
 function parseSpeedBoostVariants(effect) {
+  return recognizeSpeedEffects(effect)
+    .filter((item) => item.speedBonus > 0)
+    .map((item, index) => ({
+      label: index === 0 ? "默认" : item.label,
+      speedBonus: item.speedBonus,
+      confidence: item.confidence,
+      evidence: item.evidence
+    }));
+}
+
+function recognizeSpeedEffects(effect) {
+  const text = normalizeEffectText(effect);
+  if (!text) return [];
+
   const variants = [];
-  const patterns = [
-    { regex: /速度(?:永久|临时)?\s*\+\s*(\d+)/g, valueIndex: 1 },
-    { regex: /\+\s*(\d+)\s*速度值?/g, valueIndex: 1 },
-    { regex: /增加\s*(\d+)\s*速度值?/g, valueIndex: 1 },
-    { regex: /获得\s*(\d+)\s*速度值?/g, valueIndex: 1 }
-  ];
-
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.regex.exec(effect))) {
-      const speedBonus = Number(match[pattern.valueIndex]);
-      if (!Number.isFinite(speedBonus) || speedBonus <= 0) continue;
-
-      const label = variants.length === 0 ? "默认" : labelBefore(effect, match.index);
-      if (!variants.some((item) => item.speedBonus === speedBonus && item.label === label)) {
-        variants.push({ label, speedBonus });
-      }
+  const clauses = splitEffectClauses(text);
+  for (const clause of clauses) {
+    const candidates = speedEffectCandidates(clause);
+    for (const candidate of candidates) {
+      const duplicate = variants.some((item) =>
+        item.speedBonus === candidate.speedBonus &&
+        item.label === candidate.label &&
+        item.evidence === candidate.evidence
+      );
+      if (!duplicate) variants.push(candidate);
     }
   }
 
   return variants;
+}
+
+function normalizeEffectText(effect) {
+  return decodeHtml(String(effect || ""))
+    .replace(/&#160;|&nbsp;/g, " ")
+    .replace(/\s+/g, "")
+    .trim();
+}
+
+function splitEffectClauses(text) {
+  return String(text || "")
+    .split(/[。；;！!？?]/)
+    .flatMap((part) => part.split(/(?=应对|若|如果|当|本技能)/))
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function speedEffectCandidates(clause) {
+  if (!clause.includes("速度")) return [];
+  const patterns = [
+    { regex: /速度(?:值|能力|等级)?(?:永久|临时|持续)?\s*\+\s*(\d+)/g, sign: 1 },
+    { regex: /速度(?:值|能力|等级)?(?:永久|临时|持续)?(?:提升|提高|增加|上升|获得|强化)\s*(\d+)/g, sign: 1 },
+    { regex: /(?:提升|提高|增加|上升|获得|强化)\s*(?:自身|自己|我方|本精灵)?\s*(\d+)\s*(?:点|的)?速度(?:值|能力|等级)?/g, sign: 1 },
+    { regex: /\+\s*(\d+)\s*(?:点|的)?速度(?:值|能力|等级)?/g, sign: 1 },
+    { regex: /速度(?:值|能力|等级)?(?:降低|减少|下降|削弱)\s*(\d+)/g, sign: -1 },
+    { regex: /(?:降低|减少|下降|削弱)\s*(?:敌方|对方|目标|自身|自己|我方)?\s*(\d+)\s*(?:点|的)?速度(?:值|能力|等级)?/g, sign: -1 },
+    { regex: /速度(?:值|能力|等级)?\s*-\s*(\d+)/g, sign: -1 }
+  ];
+
+  const candidates = [];
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.regex.exec(clause))) {
+      const amount = Number(match[1]) * pattern.sign;
+      if (!Number.isFinite(amount) || amount === 0) continue;
+      const confidence = speedEffectConfidence(clause, match[0], amount);
+      if (confidence < 60) continue;
+
+      candidates.push({
+        label: labelBefore(clause, match.index),
+        speedBonus: amount,
+        confidence,
+        evidence: match[0]
+      });
+    }
+  }
+
+  return candidates;
+}
+
+function speedEffectConfidence(clause, evidence, amount) {
+  let score = 0;
+  if (/速度/.test(evidence)) score += 25;
+  if (/[+\-]\d+|\d+/.test(evidence)) score += 20;
+  if (/获得|提升|提高|增加|上升|强化|永久|临时|持续/.test(clause)) score += 35;
+  if (/自己|自身|我方|本精灵/.test(clause)) score += 12;
+  if (/降低|减少|下降|削弱/.test(clause) && amount < 0) score += 20;
+  if (/改为|变为/.test(clause)) score += 15;
+  if (/速度差|速度比|越高|越低|威力|伤害|先手|优先|命中|闪避/.test(clause)) score -= 45;
+  if (/敌方|对方|目标/.test(clause) && amount > 0 && !/自己|自身|我方|本精灵/.test(clause)) score -= 25;
+  if (/速度差值/.test(clause)) score -= 70;
+  return Math.max(0, Math.min(100, score));
+}
+
+function runSpeedEffectRecognizerSelfTest() {
+  const cases = [
+    {
+      name: "示弱",
+      text: "自己获得萌化：速度永久+150。",
+      expected: [150]
+    },
+    {
+      name: "快速移动",
+      text: "自己获得速度+80，应对防御：改为速度+160。",
+      expected: [80, 160]
+    },
+    {
+      name: "折射",
+      text: "携带电属性技能时，自己获得50速度值。",
+      expected: [50]
+    },
+    {
+      name: "文字顺序变化",
+      text: "提升自身150点速度。",
+      expected: [150]
+    },
+    {
+      name: "伤害依赖速度差，不是加速",
+      text: "造成物伤，速度比敌方越高，本次技能威力越高。速度差值越大威力越高。",
+      expected: []
+    }
+  ];
+
+  let failed = 0;
+  for (const item of cases) {
+    const actual = recognizeSpeedEffects(item.text).map((variant) => variant.speedBonus);
+    const ok = JSON.stringify(actual) === JSON.stringify(item.expected);
+    console.log(`${ok ? "✓" : "✗"} ${item.name}: ${JSON.stringify(actual)}`);
+    if (!ok) failed += 1;
+  }
+
+  if (failed) {
+    throw new Error(`速度效果识别器自检失败：${failed} 项`);
+  }
 }
 
 async function attachSpeedSkillsToSpirits(skillDatabase) {
