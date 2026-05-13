@@ -30,6 +30,9 @@ const shouldUpdateSpirits = !args.has("--skills-only");
 const shouldUpdateSkills = !args.has("--spirits-only");
 const PROGRESS_PREFIX = "__ROCO_PROGRESS__";
 const runRecognizerSelfTest = args.has("--recognizer-self-test");
+const debugSpiritUrlArg = process.argv
+  .slice(2)
+  .find((arg) => arg.startsWith("--debug-spirit-url="));
 
 main().catch((error) => {
   console.error(`更新失败：${error.stack || error.message}`);
@@ -39,6 +42,16 @@ main().catch((error) => {
 async function main() {
   if (runRecognizerSelfTest) {
     runSpeedEffectRecognizerSelfTest();
+    return;
+  }
+
+  if (debugSpiritUrlArg) {
+    const url = debugSpiritUrlArg.slice("--debug-spirit-url=".length);
+    const html = await fetchText(url);
+    console.log(JSON.stringify({
+      url,
+      speedTraits: parseSpeedTraits(html, htmlToText(html))
+    }, null, 2));
     return;
   }
 
@@ -656,11 +669,20 @@ function parseSpeedTraits(html, text) {
 function parseTraitBlocks(html, text) {
   const decodedHtml = decodeURIComponentSafe(decodeHtml(html));
   const blocks = [];
-  const blockRegex = /<div[^>]*class="[^"]*rocom_sprite_info_characteristic_content[^"]*"[^>]*>([\s\S]*?)(?=<\/div>\s*<\/div>\s*<div class="rocom_sprite_temp_attribute_box"|<div class="rocom_sprite_info_characteristic_content"|<div class="rocom_sprite_temp_attribute_box")/g;
+  const traitArea = sliceTraitHtmlArea(decodedHtml);
+  const blockRegex = /<div\b[^>]*class="([^"]*)"[^>]*>/g;
   let match;
 
-  while ((match = blockRegex.exec(decodedHtml))) {
-    const block = match[1];
+  while ((match = blockRegex.exec(traitArea))) {
+    if (!hasClassToken(match[1], "rocom_sprite_info_characteristic_content")) {
+      continue;
+    }
+
+    const block = extractDivBlock(traitArea, match.index);
+    if (!block) {
+      continue;
+    }
+
     const titleMatch = block.match(/class="[^"]*rocom_sprite_info_characteristic_title[^"]*"[^>]*>([\s\S]*?)<\/p>/);
     const effectMatch = block.match(/class="[^"]*rocom_sprite_info_characteristic_text[^"]*"[^>]*>([\s\S]*?)<\/p>/);
     const imageTitleMatch = block.match(/(?:alt|title)="([^"]+)"/);
@@ -675,6 +697,38 @@ function parseTraitBlocks(html, text) {
 
   const section = parseTraitSection(html, text);
   return section ? [{ name: inferTraitName(section), effect: section }] : [];
+}
+
+function sliceTraitHtmlArea(decodedHtml) {
+  const characteristicIndex = decodedHtml.search(/<div\b[^>]*class="[^"]*rocom_sprite_characteristic[^"]*"[^>]*>/);
+  const start = characteristicIndex >= 0 ? characteristicIndex : 0;
+  const rest = decodedHtml.slice(start);
+  const attributeIndex = rest.search(/<div\b[^>]*class="[^"]*rocom_sprite_temp_attribute_box[^"]*"[^>]*>/);
+  return attributeIndex >= 0 ? rest.slice(0, attributeIndex) : rest;
+}
+
+function hasClassToken(classValue, token) {
+  return String(classValue || "").split(/\s+/).includes(token);
+}
+
+function extractDivBlock(html, startIndex) {
+  const tagRegex = /<\/?div\b[^>]*>/g;
+  tagRegex.lastIndex = startIndex;
+  let depth = 0;
+  let match;
+
+  while ((match = tagRegex.exec(html))) {
+    if (match[0][1] === "/") {
+      depth -= 1;
+      if (depth === 0) {
+        return html.slice(startIndex, tagRegex.lastIndex);
+      }
+    } else {
+      depth += 1;
+    }
+  }
+
+  return "";
 }
 
 function parseTraitSection(html, text) {

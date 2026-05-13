@@ -1,6 +1,6 @@
 {
   "name": "roco-speed-tool",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "洛克王国世界速度计算桌面工具",
   "main": "electron/main.js",
   "scripts": {
